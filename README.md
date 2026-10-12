@@ -13,6 +13,7 @@ Open `index.html` in any modern browser. Everything is in that one file, with no
   - **Trace a picture** puts any photo or drawing faintly on the card so you can squeeze paint over it. It is left out of the saved picture.
   - **Save as template** records everything squeezed since the last wipe, plus your ruler pulls, your message and your traced picture. It appears next to the built-in templates and is kept in this browser. **Squeeze it for me** and **Scrape it for me** replay it.
   - **Download template** saves it as a `.json` file to share. **Open template file** (or dropping a file onto the card) loads one. Template files are checked and clamped before use, so a broken or hostile file is rejected.
+- **Shared gallery** (only in the Claude-hosted version): **Post to gallery** shares your card with everyone who opens the page. The gallery under the card lists everyone's posts live, and tapping one loads it to play. Anyone who can open the page can browse and play. Posting needs Contributor access or above. People can remove their own posts, and the page's owner can remove any post. Each person can have up to 12 posts.
 - **Undo**, **Wipe paint**, and **Save picture** (PNG).
 
 Keyboard: `S` squeeze, `R` ruler, `Q`/`E` turn the ruler, `[`/`]` nozzle size, `Ctrl/Cmd+Z` undo.
@@ -35,6 +36,23 @@ Keyboard: `S` squeeze, `R` ruler, `Q`/`E` turn the ruler, `[`/`]` nozzle size, `
 ```
 
 Coordinates are in card cells (400 × 600). `c` is a paint id (`red`, `orange`, `yellow`, `green`, `sky`, `blue`, `navy`, `grape`, `pink`, `white`, `cocoa`, `black`). Each line point is `[x, y, radius]`. Each scrape step gives the ruler angle `a`, length (`full`, `half` or `short`), where its centre starts (`x`, `y`) and how far it travels along its normal (`d`, negative pulls up or left). Replays do all the squeezes first, then the pulls. `picture` is optional.
+
+## Shared gallery storage
+
+The Claude-hosted page declares the `db` capability with these rules:
+
+```json
+[
+  { "path": "posts", "read": "view", "write": "owner" },
+  { "path": "posts/{self}", "write": "interact" }
+]
+```
+
+- `posts/<user id>` is that person's index, `{ posts: [{ id, name, thumb, at }] }`. Each `thumb` is a 120 × 180 JPEG data URL. The gallery subscribes to this collection.
+- `posts/<user id>/full/<post id>` holds the full template, in the same format as a template file. It is fetched only when someone plays the card.
+- Everything read back is validated like an uploaded template file and shown with `textContent`.
+
+On a plain web page (GitHub Pages, or opening `index.html` directly) the gallery is hidden, and templates are shared as files.
 
 ## How the paint works
 

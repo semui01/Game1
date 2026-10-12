@@ -64,6 +64,12 @@ h1 {
 }
 h1 .amp { color: var(--accent); }
 .tagline { margin: 0; color: var(--ink-dim); max-width: 60ch; }
+.to-gallery {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 
 .stage {
   display: grid;
@@ -226,6 +232,43 @@ input[type="text"] {
 .chip-wrap .chip[aria-pressed="true"] + .chip-x { border-color: transparent; }
 .chip-wrap .chip[aria-pressed="true"] + .chip-x { background: var(--ink); color: var(--mat-deep); }
 .card.drop { outline: 3px dashed var(--accent); outline-offset: 8px; }
+
+/* Shared gallery: posted cards lie on the mat, each tilted a little. */
+.gallery { display: flex; flex-direction: column; gap: 16px; padding-top: 10px; }
+.gallery-head { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 14px; row-gap: 2px; }
+.gallery h2 { margin: 0; font: 400 26px/1.1 var(--display); letter-spacing: 0.01em; }
+.gallery-sub { margin: 0; color: var(--ink-dim); max-width: 62ch; }
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 24px 18px; }
+.g-card { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.g-play {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--paper);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.42), 0 2px 5px rgba(0, 0, 0, 0.3);
+  transform: rotate(var(--tilt, 0deg));
+  transition: transform 140ms ease;
+}
+.g-play:hover { transform: rotate(0deg) translateY(-3px); }
+.g-play img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.g-name { margin: 8px 0 0; font-weight: 700; font-size: 14px; line-height: 1.25; overflow-wrap: anywhere; }
+.g-by { margin: 0; font-size: 12px; color: var(--ink-dim); overflow-wrap: anywhere; }
+.g-remove {
+  align-self: flex-start;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  font-size: 12px;
+  color: var(--ink-dim);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.g-remove.confirm { color: var(--accent); font-weight: 600; }
+.gallery-more { align-self: center; flex: 0 0 auto; }
 .keys { margin: 0; font-size: 12px; color: var(--ink-dim); }
 .keys kbd {
   font: 600 11px var(--body);
@@ -253,7 +296,7 @@ input[type="text"] {
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 @media (prefers-reduced-motion: reduce) {
-  .toast, .swatch { transition: none; }
+  .toast, .swatch, .g-play { transition: none; }
 }
 </style>
 </head>
@@ -262,6 +305,7 @@ input[type="text"] {
   <header class="top">
     <h1>Squeeze <span class="amp">&amp;</span> Scrape</h1>
     <p class="tagline">Squeeze puffy paint onto the card, then pull the ruler through it. The smears turn into a picture.</p>
+    <a class="to-gallery" id="to-gallery" href="#gallery" hidden>Browse the shared gallery</a>
   </header>
 
   <main class="stage">
@@ -335,8 +379,9 @@ input[type="text"] {
           <button class="btn" id="save-template" type="button">Save as template</button>
           <button class="btn" id="download-template" type="button" hidden>Download template</button>
         </div>
+        <button class="btn" id="post-gallery" type="button" hidden>Post to gallery</button>
         <button class="btn" id="remove-picture" type="button" hidden>Remove picture</button>
-        <p class="note">Add a photo or drawing to paint over. <b>Save as template</b> keeps your squeezes and pulls so anyone can replay them. Download it to share.<span class="drop-tip"> You can also drop a picture or template file onto the card.</span></p>
+        <p class="note">Add a photo or drawing to paint over. <b>Save as template</b> keeps your squeezes and pulls so anyone can replay them.<span id="gallery-tip" hidden> <b>Post to gallery</b> shares it with everyone who opens this page.</span> Download it to share as a file.<span class="drop-tip"> You can also drop a picture or template file onto the card.</span></p>
         <input type="file" id="file-picture" accept="image/*" hidden>
         <input type="file" id="file-template" accept=".json,application/json" hidden>
       </section>
@@ -351,6 +396,15 @@ input[type="text"] {
       <p class="keys"><kbd>S</kbd> squeeze · <kbd>R</kbd> ruler · <kbd>Q</kbd>/<kbd>E</kbd> turn ruler · <kbd>[</kbd>/<kbd>]</kbd> size · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</p>
     </aside>
   </main>
+
+  <section class="gallery" id="gallery" aria-labelledby="gallery-title" hidden>
+    <div class="gallery-head">
+      <h2 id="gallery-title">Shared gallery</h2>
+      <p class="gallery-sub" id="gallery-status">Loading the gallery…</p>
+    </div>
+    <div class="gallery-grid" id="gallery-grid"></div>
+    <button class="btn gallery-more" id="gallery-more" type="button" hidden>Show more</button>
+  </section>
 </div>
 <div class="toast" id="toast" role="status"></div>
 
@@ -1245,7 +1299,9 @@ input[type="text"] {
     },
     blank: { name: 'Blank card', msg: '', scrape: null, items: [] },
   };
-  const tplById = (id) => (Object.prototype.hasOwnProperty.call(TEMPLATES, id) ? TEMPLATES[id] : state.custom.find((t) => t.id === id) || TEMPLATES.blank);
+  const tplById = (id) => (Object.prototype.hasOwnProperty.call(TEMPLATES, id)
+    ? TEMPLATES[id]
+    : state.custom.find((t) => t.id === id) || (state.galleryTpl && state.galleryTpl.id === id ? state.galleryTpl : TEMPLATES.blank));
   const currentTemplate = () => tplById(state.template);
 
   // Scrape steps as { a, len, x, y, d }: ruler angle and length, where its centre
@@ -1425,6 +1481,7 @@ input[type="text"] {
     mode: 'scrape', paint: 'red', size: 10, template: 'cake', msg: TEMPLATES.cake.msg, msgEdited: false,
     custom: [],     // the viewer's own templates
     picture: null,  // { url, img } traced under the paint
+    galleryTpl: null, // a template being played from the shared gallery
   };
   // What has been done on this card since it was last wiped: the template it
   // started from, every squeeze stroke, and every hand-made pull.
@@ -1516,6 +1573,7 @@ input[type="text"] {
     $('auto-scrape').disabled = b;
     $('save').disabled = b;
     for (const id of ['pick-picture', 'pick-template', 'save-template', 'download-template', 'remove-picture']) $(id).disabled = b;
+    syncPostButton();
   }
 
   // Swatches and templates
@@ -1974,6 +2032,274 @@ input[type="text"] {
   });
 
   // ---------------------------------------------------------------------------
+  // Shared gallery (inside Claude). Everyone who can open the page browses it;
+  // Contributors and up post. Each person's posts live under posts/<their id>:
+  // that document is a small index (names and thumbnails) the gallery lists
+  // live, and posts/<id>/full/<postId> holds each full template, fetched only
+  // when someone plays it. Only the poster, or the page's owner, can remove a
+  // post. Everything read back is someone else's input, so it is checked like
+  // a template file and shown with textContent.
+  // ---------------------------------------------------------------------------
+  const MAX_POSTS = 12;
+  const gallery = {
+    db: null, user: null, me: null, canPost: null, isOwner: false, readOnly: false,
+    entries: [], shown: 24, posting: false, renderSeq: 0,
+  };
+  const THUMB_RE = /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/;
+  function cleanEntry(p) {
+    if (!p || typeof p !== 'object') return null;
+    if (typeof p.id !== 'string' || !/^p-[a-z0-9]{4,24}$/.test(p.id)) return null;
+    if (typeof p.thumb !== 'string' || p.thumb.length > 40000 || !THUMB_RE.test(p.thumb)) return null;
+    const at = Number(p.at);
+    if (!Number.isFinite(at)) return null;
+    return { id: p.id, name: cleanText(p.name, 24).trim() || 'Untitled', thumb: p.thumb, at };
+  }
+  function ago(ms) {
+    const m = Math.max(0, (Date.now() - ms) / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${Math.floor(m)} min ago`;
+    if (m < 60 * 24) return `${Math.floor(m / 60)} h ago`;
+    if (m < 60 * 24 * 30) return `${Math.floor(m / 1440)} d ago`;
+    return new Date(ms).toLocaleDateString();
+  }
+  function syncPostButton() {
+    const can = !!gallery.db && !!gallery.me && gallery.canPost !== false && !gallery.readOnly;
+    const b = $('post-gallery');
+    b.hidden = !can;
+    b.disabled = busy() || gallery.posting;
+    b.textContent = gallery.posting ? 'Posting…' : 'Post to gallery';
+    $('gallery-tip').hidden = !can;
+  }
+  function setGalleryStatus(text) { $('gallery-status').textContent = text; }
+
+  async function initGallery() {
+    if (!hosted) return; // a plain web page has no shared store
+    $('gallery').hidden = false;
+    $('to-gallery').hidden = false;
+    let db = null, user = null;
+    try {
+      [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+    } catch (_) { /* treated as unavailable below */ }
+    if (!db) {
+      setGalleryStatus("The shared gallery isn't available in this view. You can still play every template above.");
+      return;
+    }
+    gallery.db = db;
+    gallery.user = user;
+    if (user) {
+      const [me, can, owner] = await Promise.all([user.id(), user.can('data.write'), user.isOwner()]);
+      gallery.me = me;
+      gallery.canPost = me ? can : false;
+      gallery.isOwner = owner;
+    } else {
+      gallery.canPost = false;
+    }
+    syncPostButton();
+    db.collection('posts').limit(500).onSnapshot(onGallery, () => {
+      setGalleryStatus('The gallery stopped updating. Reload the page to see new posts.');
+    });
+  }
+
+  function onGallery(snap) {
+    const entries = [];
+    for (const d of snap.docs) {
+      const body = d.data();
+      if (!body || !Array.isArray(body.posts)) continue;
+      for (const p of body.posts.slice(0, MAX_POSTS)) {
+        const e = cleanEntry(p);
+        if (e) entries.push({ ...e, uid: d.id });
+      }
+    }
+    entries.sort((a, b) => b.at - a.at);
+    gallery.entries = entries;
+    renderGallery();
+  }
+
+  async function renderGallery() {
+    const seq = ++gallery.renderSeq;
+    const list = gallery.entries.slice(0, gallery.shown);
+    const ids = [...new Set(list.map((e) => e.uid))];
+    let people = {};
+    if (gallery.user && ids.length) {
+      try { people = await gallery.user.profiles(ids); } catch (_) { people = {}; }
+    }
+    if (seq !== gallery.renderSeq) return; // a newer snapshot already drew
+    const n = gallery.entries.length;
+    const may = !!gallery.me && gallery.canPost !== false && !gallery.readOnly;
+    if (!n) {
+      setGalleryStatus(may
+        ? 'Nothing here yet. Make a card, then press Post to gallery to share it with everyone who opens this page.'
+        : 'Nothing here yet. Cards people post will show up here for you to play.');
+    } else {
+      setGalleryStatus(`${n} ${n === 1 ? 'card' : 'cards'} from people using this page. Tap one to load it, then pull the ruler.${may ? '' : ' Posting is open to contributors.'}`);
+    }
+    const grid = $('gallery-grid');
+    grid.textContent = '';
+    list.forEach((e, i) => {
+      const card = document.createElement('article');
+      card.className = 'g-card';
+      const play = document.createElement('button');
+      play.type = 'button';
+      play.className = 'g-play';
+      play.style.setProperty('--tilt', `${(((i * 7) % 5) - 2) * 0.6}deg`);
+      play.setAttribute('aria-label', `Play ${e.name}`);
+      const img = document.createElement('img');
+      img.src = e.thumb;
+      img.alt = '';
+      img.loading = 'lazy';
+      img.width = 120;
+      img.height = 180;
+      play.append(img);
+      play.addEventListener('click', () => playPost(e));
+      const name = document.createElement('p');
+      name.className = 'g-name';
+      name.textContent = e.name;
+      const by = document.createElement('p');
+      by.className = 'g-by';
+      const who = e.uid === gallery.me ? 'you' : (people[e.uid] && people[e.uid].name) || 'someone';
+      by.textContent = `by ${who} · ${ago(e.at)}`;
+      card.append(play, name, by);
+      if (e.uid === gallery.me || gallery.isOwner) {
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'g-remove';
+        rm.textContent = 'Remove';
+        let armed = 0;
+        rm.addEventListener('click', () => {
+          if (!armed) {
+            rm.textContent = 'Tap again to remove';
+            rm.classList.add('confirm');
+            armed = setTimeout(() => { armed = 0; rm.textContent = 'Remove'; rm.classList.remove('confirm'); }, 3000);
+            return;
+          }
+          clearTimeout(armed);
+          rm.disabled = true;
+          removePost(e);
+        });
+        card.append(rm);
+      }
+      grid.append(card);
+    });
+    $('gallery-more').hidden = gallery.entries.length <= gallery.shown;
+  }
+  $('gallery-more').addEventListener('click', () => { gallery.shown += 24; renderGallery(); });
+
+  async function playPost(e) {
+    if (busy() || !gallery.db) return;
+    let t;
+    try {
+      const snap = await gallery.db.doc(`posts/${e.uid}/full/${e.id}`).get();
+      if (!snap.exists) { toast('That card was removed'); return; }
+      t = sanitizeTemplate(snap.data());
+    } catch (err) {
+      toast(err && err.userMessage ? err.userMessage : "Couldn't open that card. Try again.");
+      return;
+    }
+    t.id = `g-${e.id}`;
+    t.name = e.name;
+    state.galleryTpl = t;
+    setTemplate(t.id, { squeeze: true });
+    toast(`Playing “${e.name}”`);
+    $('card').scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+  }
+
+  function shrinkPicture(url, W, H, q) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        c.getContext('2d').drawImage(img, 0, 0, W, H);
+        resolve(c.toDataURL('image/jpeg', q));
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  }
+  function makeThumb() {
+    const W = 120, H = 180;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    drawPaper(x, W, H, true);
+    renderPaint();
+    x.imageSmoothingEnabled = true;
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(paintCanvas, 0, 0, W, H);
+    return c.toDataURL('image/jpeg', 0.78);
+  }
+  function galleryWriteFailed(err) {
+    const code = err && err.code;
+    if (code === 'invalid_argument') {
+      gallery.readOnly = true;
+      syncPostButton();
+      renderGallery();
+      toast('Posting is open to contributors on this page');
+    } else if (code === 'quota_exceeded') {
+      toast('The gallery is full. Remove an old card to make room.');
+    } else if (code === 'resource_exhausted') {
+      toast('Too many changes at once. Wait a moment and try again.');
+    } else {
+      toast("Couldn't reach the gallery. Try again.");
+    }
+  }
+
+  async function postToGallery() {
+    if (busy() || gallery.posting || !gallery.db || !gallery.me) return;
+    const t = recipeTemplate();
+    if (!t) { toast('Squeeze some paint first'); return; }
+    const me = gallery.me;
+    if (gallery.entries.filter((e) => e.uid === me).length >= MAX_POSTS) {
+      toast(`You have ${MAX_POSTS} cards in the gallery. Remove one to post another.`);
+      return;
+    }
+    const full = templateToJSON(t);
+    if (full.picture) full.picture = await shrinkPicture(full.picture, 400, 600, 0.72);
+    if (JSON.stringify(full).length > 240000) {
+      toast('This card is too detailed to post. Try fewer strokes or remove the picture.');
+      return;
+    }
+    const id = 'p-' + Date.now().toString(36) + Math.floor(Math.random() * 46656).toString(36);
+    const entry = { id, name: t.name, thumb: makeThumb(), at: Date.now() };
+    gallery.posting = true;
+    syncPostButton();
+    const fullRef = gallery.db.doc(`posts/${me}/full/${id}`);
+    try {
+      await fullRef.set(full);
+      const indexRef = gallery.db.doc(`posts/${me}`);
+      const snap = await indexRef.get();
+      const prev = snap.exists && Array.isArray(snap.data().posts) ? snap.data().posts.filter((p) => cleanEntry(p)) : [];
+      try {
+        await indexRef.set({ posts: [entry, ...prev].slice(0, MAX_POSTS) });
+      } catch (err) {
+        fullRef.delete().catch(() => {});
+        throw err;
+      }
+      toast('Posted to the gallery');
+    } catch (err) {
+      galleryWriteFailed(err);
+    } finally {
+      gallery.posting = false;
+      syncPostButton();
+    }
+  }
+  async function removePost(e) {
+    if (!gallery.db) return;
+    try {
+      const indexRef = gallery.db.doc(`posts/${e.uid}`);
+      const snap = await indexRef.get();
+      const rest = snap.exists && Array.isArray(snap.data().posts) ? snap.data().posts.filter((p) => p && p.id !== e.id) : [];
+      await indexRef.set({ posts: rest });
+      await gallery.db.doc(`posts/${e.uid}/full/${e.id}`).delete();
+      toast('Removed from the gallery');
+    } catch (err) {
+      galleryWriteFailed(err);
+      renderGallery();
+    }
+  }
+  $('post-gallery').addEventListener('click', postToGallery);
+
+  // ---------------------------------------------------------------------------
   // Boot: open on the birthday cake with the paint already squeezed, the ruler
   // resting above it, ready to pull.
   // ---------------------------------------------------------------------------
@@ -1993,6 +2319,7 @@ input[type="text"] {
 
   new ResizeObserver(resize).observe(canvas);
   resize();
+  initGallery();
   if (document.fonts && document.fonts.load) {
     Promise.all([document.fonts.load('800 40px Sniglet'), document.fonts.load('600 12px Figtree')]).then(redrawPaper, () => {});
   }
