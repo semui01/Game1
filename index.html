@@ -1,0 +1,1602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Squeeze &amp; Scrape</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Figtree:wght@400;500;600;700&family=Sniglet:wght@400;800&display=swap">
+<style>
+/* Layout: a cutting mat desk. The card sits on the mat, the tool tray beside it; they stack under 780px. */
+:root {
+  --mat: #24302b;
+  --mat-deep: #18211d;
+  --grid: rgba(205, 232, 218, 0.07);
+  --grid-major: rgba(205, 232, 218, 0.17);
+  --tray: rgba(15, 22, 19, 0.86);
+  --tray-edge: rgba(220, 240, 230, 0.13);
+  --ink: #eef3ee;
+  --ink-dim: #a5b5ac;
+  --accent: #ffd31c;
+  --accent-ink: #2b2300;
+  --paper: #fbfbf7;
+  --display: "Bagel Fat One", "Arial Rounded MT Bold", system-ui, sans-serif;
+  --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --hand: "Sniglet", "Arial Rounded MT Bold", system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font: 15px/1.45 var(--body);
+  color: var(--ink);
+  background-color: var(--mat);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 160px 160px, 160px 160px, 32px 32px, 32px 32px;
+  background-position: -1px -1px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding-inline: 16px;
+  padding-block: 14px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.top { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 16px; row-gap: 2px; }
+h1 {
+  margin: 0;
+  font: 400 clamp(28px, 4.2vw, 40px)/1.05 var(--display);
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+}
+h1 .amp { color: var(--accent); }
+.tagline { margin: 0; color: var(--ink-dim); max-width: 60ch; }
+
+.stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 28px;
+  align-items: start;
+}
+@media (max-width: 780px) {
+  .stage { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+}
+.card-col { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
+.card {
+  position: relative;
+  width: min(100%, max(260px, min(450px, calc((100vh - 150px) * 2 / 3))));
+  width: min(100%, max(260px, min(450px, calc((100dvh - 150px) * 2 / 3))));
+  max-width: 100%;
+  aspect-ratio: 2 / 3;
+  background: var(--paper);
+  border-radius: 2px;
+  box-shadow: 0 22px 40px rgba(0, 0, 0, 0.42), 0 3px 8px rgba(0, 0, 0, 0.35);
+  transform: rotate(-0.6deg);
+}
+.card canvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+  touch-action: none;
+  border-radius: inherit;
+  cursor: crosshair;
+}
+.card canvas.grab { cursor: grab; }
+.card canvas.grabbing { cursor: grabbing; }
+.hint {
+  margin: 0;
+  min-height: 2.9em;
+  max-width: 450px;
+  text-align: center;
+  color: var(--ink-dim);
+  text-wrap: balance;
+}
+.hint b { color: var(--ink); font-weight: 600; }
+
+.panel {
+  background: var(--tray);
+  border: 1px solid var(--tray-edge);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.group { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.label output { letter-spacing: 0.04em; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mode {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 10px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--tray-edge);
+  background: rgba(255, 255, 255, 0.03);
+}
+.mode svg { grid-row: span 2; width: 28px; height: 28px; }
+.mode strong { font-weight: 700; font-size: 16px; line-height: 1.1; }
+.mode small { font-size: 12px; color: var(--ink-dim); line-height: 1.2; }
+.mode[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.mode[aria-pressed="true"] small { color: var(--accent-ink); opacity: 0.75; }
+
+.swatches { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 9px; }
+.swatch {
+  aspect-ratio: 1;
+  width: 100%;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.85) 0 9%, rgba(255, 255, 255, 0) 26%),
+    radial-gradient(circle at 60% 72%, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0) 60%),
+    var(--c);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.45);
+  transition: transform 120ms ease;
+}
+.swatch:hover { transform: translateY(-1px) scale(1.04); }
+.swatch[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--tray-edge);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--mat-deep); border-color: transparent; }
+input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+input[type="text"] {
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: 1px solid var(--tray-edge);
+  background: rgba(0, 0, 0, 0.25);
+  font-family: var(--hand);
+  font-size: 16px;
+  letter-spacing: 0.04em;
+}
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn {
+  flex: 1 1 auto;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--tray-edge);
+  background: rgba(255, 255, 255, 0.06);
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.11); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+.btn.primary:hover:not(:disabled) { background: #ffdf55; }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.divider { height: 1px; background: var(--tray-edge); margin: 0; border: 0; }
+.keys { margin: 0; font-size: 12px; color: var(--ink-dim); }
+.keys kbd {
+  font: 600 11px var(--body);
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--tray-edge);
+  background: rgba(255, 255, 255, 0.05);
+}
+@media (hover: none) { .keys { display: none; } }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 12px);
+  background: var(--ink);
+  color: var(--mat-deep);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) {
+  .toast, .swatch { transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1>Squeeze <span class="amp">&amp;</span> Scrape</h1>
+    <p class="tagline">Squeeze puffy paint onto the card, then pull the ruler through it. The smears turn into a picture.</p>
+  </header>
+
+  <main class="stage">
+    <div class="card-col">
+      <div class="card" id="card">
+        <canvas id="card-canvas" aria-label="Paint card. Squeeze paint or drag the ruler across it."></canvas>
+      </div>
+      <p class="hint" id="hint" aria-live="polite"></p>
+    </div>
+
+    <aside class="panel" aria-label="Tools">
+      <div class="modes" role="group" aria-label="Tool">
+        <button class="mode" id="mode-squeeze" type="button" aria-pressed="false">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 4h12l3 5v12l-5 4h-8l-5-4V9z" fill="currentColor" opacity=".18"/><path d="M7 4h12l3 5v12l-5 4h-8l-5-4V9zM9 25v2h8v-2M13 27v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="13" cy="31" r="1.2" fill="currentColor"/></svg>
+          <strong>Squeeze</strong>
+          <small>dots &amp; lines</small>
+        </button>
+        <button class="mode" id="mode-scrape" type="button" aria-pressed="true">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="11" width="28" height="10" rx="1.5" fill="currentColor" opacity=".18"/><rect x="2" y="11" width="28" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 11v4M12 11v6M17 11v4M22 11v6M27 11v4" stroke="currentColor" stroke-width="1.6"/></svg>
+          <strong>Scrape</strong>
+          <small>drag the ruler</small>
+        </button>
+      </div>
+
+      <section class="group" id="squeeze-opts" hidden>
+        <p class="label">Paint</p>
+        <div class="swatches" id="swatches" role="group" aria-label="Paint colour"></div>
+        <label class="label" for="size">Nozzle size <output id="size-out" for="size">10</output></label>
+        <input type="range" id="size" min="4" max="22" step="1" value="10">
+      </section>
+
+      <section class="group" id="scrape-opts">
+        <p class="label">Ruler</p>
+        <div class="chips" id="angle-chips" role="group" aria-label="Ruler angle presets">
+          <button class="chip" type="button" data-angle="0">Flat</button>
+          <button class="chip" type="button" data-angle="90">Upright</button>
+          <button class="chip" type="button" data-angle="45">Tilt ╲</button>
+          <button class="chip" type="button" data-angle="-45">Tilt ╱</button>
+        </div>
+        <label class="label" for="angle">Angle <output id="angle-out" for="angle">0°</output></label>
+        <input type="range" id="angle" min="-90" max="90" step="5" value="0">
+        <div class="chips" id="len-chips" role="group" aria-label="Ruler length">
+          <button class="chip" type="button" data-len="full">Long ruler</button>
+          <button class="chip" type="button" data-len="half">Half</button>
+          <button class="chip" type="button" data-len="short">Card scraper</button>
+        </div>
+      </section>
+
+      <hr class="divider">
+
+      <section class="group">
+        <p class="label">Card</p>
+        <div class="chips" id="templates" role="group" aria-label="Card template"></div>
+        <div class="row">
+          <button class="btn" id="auto-squeeze" type="button">Squeeze it for me</button>
+          <button class="btn primary" id="auto-scrape" type="button">Scrape it for me</button>
+        </div>
+        <label class="label" for="msg">Message</label>
+        <input type="text" id="msg" maxlength="30" autocomplete="off" spellcheck="false">
+      </section>
+
+      <hr class="divider">
+
+      <div class="row">
+        <button class="btn" id="undo" type="button" disabled>Undo</button>
+        <button class="btn" id="clear" type="button">Wipe paint</button>
+        <button class="btn" id="save" type="button" hidden>Save picture</button>
+      </div>
+      <p class="keys"><kbd>S</kbd> squeeze · <kbd>R</kbd> ruler · <kbd>Q</kbd>/<kbd>E</kbd> turn ruler · <kbd>[</kbd>/<kbd>]</kbd> size · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</p>
+    </aside>
+  </main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------------------------------------------------------------------------
+  // Paint field. The card is a 400 x 600 grid (12 cm x 18 cm, ~33 cells per cm).
+  // Each cell holds a paint volume (thickness) and a colour stored as
+  // Kubelka-Munk K/S per channel plus a scattering weight, so paints mix like
+  // pigment (blue + yellow = green) instead of averaging to grey.
+  // ---------------------------------------------------------------------------
+  const GW = 400, GH = 600, N = GW * GH;
+  const CELLS_PER_MM = GW / 120;
+  const V = new Float32Array(N);
+  const K0 = new Float32Array(N), K1 = new Float32Array(N), K2 = new Float32Array(N);
+  const S = new Float32Array(N);
+  const visit = new Int32Array(N);
+  let visitId = 0;
+  const strokeH = new Float32Array(N);
+  const strokeOf = new Int32Array(N);
+  let strokeSeq = 0;
+
+  const srgbToLin = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const LUT_N = 4096;
+  const LIN2SRGB = new Uint8ClampedArray(LUT_N + 1);
+  for (let i = 0; i <= LUT_N; i++) {
+    const l = i / LUT_N;
+    LIN2SRGB[i] = Math.round((l <= 0.0031308 ? 12.92 * l : 1.055 * Math.pow(l, 1 / 2.4) - 0.055) * 255);
+  }
+  const toByte = (lin) => LIN2SRGB[lin <= 0 ? 0 : lin >= 1 ? LUT_N : (lin * LUT_N) | 0];
+  const ksToR = (k) => 1 + k - Math.sqrt(k * k + 2 * k);
+
+  function makePaint(id, name, hex, scatter = 1) {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => {
+      const r = Math.min(0.997, Math.max(0.003, srgbToLin(c / 255)));
+      return ((1 - r) * (1 - r)) / (2 * r);
+    });
+    return { id, name, hex, k: ch, s: scatter };
+  }
+  const PAINTS = [
+    makePaint('red', 'Cherry red', '#e3262c'),
+    makePaint('orange', 'Tangerine', '#f46b1c'),
+    makePaint('yellow', 'Sunflower', '#ffd21a'),
+    makePaint('green', 'Leaf green', '#1f9a3c'),
+    makePaint('sky', 'Sky blue', '#45b6ee'),
+    makePaint('blue', 'Cobalt', '#2456d6'),
+    makePaint('navy', 'Navy', '#1d2566'),
+    makePaint('grape', 'Grape', '#7c3fb9'),
+    makePaint('pink', 'Bubblegum', '#f27bb2'),
+    makePaint('white', 'White', '#ffffff', 3.2),
+    makePaint('cocoa', 'Cocoa', '#6b3b22'),
+    makePaint('black', 'Black', '#1b1b1b', 1.4),
+  ];
+  const PAINT = Object.fromEntries(PAINTS.map((p) => [p.id, p]));
+  const customPaints = new Map();
+  const paintFor = (id) => PAINT[id] || customPaints.get(id);
+
+  // Dirty rectangle of the paint field, in cells.
+  let dX0 = GW, dY0 = GH, dX1 = -1, dY1 = -1;
+  function markDirty(x0, y0, x1, y1) {
+    if (x0 < dX0) dX0 = x0;
+    if (y0 < dY0) dY0 = y0;
+    if (x1 > dX1) dX1 = x1;
+    if (y1 > dY1) dY1 = y1;
+  }
+  const markAll = () => markDirty(0, 0, GW - 1, GH - 1);
+
+  // Add paint to a cell. `cover` means the new paint sits on top, so only a
+  // thin film of what was underneath tints it.
+  function addPaint(i, amt, p, cover) {
+    const v = V[i];
+    const wOld = cover ? Math.min(v, 0.12) : v;
+    const so = S[i];
+    const a = wOld * so, b = amt * p.s, t = a + b;
+    if (t > 0) {
+      K0[i] = (K0[i] * a + p.k[0] * b) / t;
+      K1[i] = (K1[i] * a + p.k[1] * b) / t;
+      K2[i] = (K2[i] * a + p.k[2] * b) / t;
+      S[i] = (so * wOld + p.s * amt) / (wOld + amt);
+    }
+    V[i] = v + amt;
+  }
+
+  // Height of a squeezed blob for a given radius (bigger blobs stand taller).
+  const blobHeight = (r) => Math.min(1.6, Math.max(0.4, 0.28 + r * 0.062));
+
+  // Stamp a dome of paint. Within one stroke, heights take the max rather than
+  // summing, so a dragged line becomes an even tube instead of lumpy beads.
+  function stampDome(cx, cy, r, p, sid) {
+    if (r <= 0.3) return;
+    const h = blobHeight(r);
+    const x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(GW - 1, Math.ceil(cx + r));
+    const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(GH - 1, Math.ceil(cy + r));
+    if (x0 > x1 || y0 > y1) return;
+    const r2 = r * r;
+    for (let y = y0; y <= y1; y++) {
+      const dy = y + 0.5 - cy;
+      for (let x = x0; x <= x1; x++) {
+        const dx = x + 0.5 - cx;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= r2) continue;
+        const target = h * Math.sqrt(1 - d2 / r2);
+        const i = y * GW + x;
+        const cur = strokeOf[i] === sid ? strokeH[i] : 0;
+        if (target > cur) {
+          addPaint(i, target - cur, p, true);
+          strokeH[i] = target;
+          strokeOf[i] = sid;
+        }
+      }
+    }
+    markDirty(x0, y0, x1, y1);
+  }
+  function stampSegment(ax, ay, ar, bx, by, br, p, sid) {
+    const dist = Math.hypot(bx - ax, by - ay);
+    const steps = Math.max(1, Math.ceil(dist / 0.6));
+    for (let k = 1; k <= steps; k++) {
+      const f = k / steps;
+      stampDome(ax + (bx - ax) * f, ay + (by - ay) * f, ar + (br - ar) * f, p, sid);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // The ruler. Its leading edge is a line of samples. As it advances, each cell
+  // under the edge keeps a thin film (mostly its own colour) and the excess is
+  // pushed along in a bead carried by the sample. Paint in the bead stays in
+  // layers rather than mixing: whatever was picked up last is laid down first,
+  // which is why a red dot above a yellow dot smears out red, then yellow, then
+  // red again. Uneven pressure along the edge leaves the streaks.
+  // ---------------------------------------------------------------------------
+  const DS = 0.7;           // sample spacing along the edge, in cells
+  const D0 = 0.05;          // film left behind at normal pressure
+  const LAMBDA = 0.007;     // a fat bead presses out a thicker film
+  const OWN = 0.85;         // share of the film that is the cell's own paint
+  const DIFF = 0.035;       // sideways spread of the bead
+  const LAYERS = 4;         // colour layers each bead sample keeps apart
+  const BODY = 36;          // ruler width, in cells
+
+  const ruler = {
+    angle: 0, len: 'full',
+    ux: 1, uy: 0, nx: 0, ny: 1,
+    cx: GW / 2, cy: GH * 0.24,
+    parked: true,
+    dir: 1, lastDir: 1, active: false,
+    halfLen: 0, ns: 0, travel: 0, rev: 0,
+    // Bead layers per sample (j * LAYERS + l, top = bn[j] - 1) and total volume bt[j].
+    bv: null, bs: null, bk0: null, bk1: null, bk2: null, bn: null, bt: null, press: null,
+  };
+
+  function setAxes() {
+    const a = (ruler.angle * Math.PI) / 180;
+    ruler.ux = Math.cos(a); ruler.uy = Math.sin(a);
+    ruler.nx = -Math.sin(a); ruler.ny = Math.cos(a);
+  }
+  function rulerHalfLen(len = ruler.len) {
+    return len === 'full' ? Math.hypot(GW, GH) / 2 + 6 : len === 'half' ? GW * 0.3 : GW * 0.12;
+  }
+  // Centre of a ruler whose edge passes through (px, py).
+  function rulerCentreAt(px, py) {
+    if (ruler.len !== 'full') return { x: px, y: py };
+    const t = (GW / 2 - px) * ruler.ux + (GH / 2 - py) * ruler.uy;
+    return { x: px + ruler.ux * t, y: py + ruler.uy * t };
+  }
+  function parkRuler() {
+    // Rest the ruler just above the paint (or a quarter of the way down).
+    let top = topOfPaint();
+    if (top < 0) top = GH * 0.24;
+    const off = Math.max(14, Math.min(GH * 0.7, top - 10)) - GH / 2;
+    if (Math.abs(ruler.angle) < 1) {
+      ruler.cx = GW / 2; ruler.cy = GH / 2 + off;
+    } else {
+      ruler.cx = GW / 2 + ruler.nx * off * 0.6;
+      ruler.cy = GH / 2 + ruler.ny * off * 0.6;
+    }
+    ruler.lastDir = 1;
+    ruler.parked = true;
+  }
+  function topOfPaint() {
+    for (let y = 0; y < GH; y++) {
+      const row = y * GW;
+      for (let x = 0; x < GW; x++) if (V[row + x] > 0.2) return y;
+    }
+    return -1;
+  }
+
+  function seeded(seed) {
+    let s = seed >>> 0;
+    return () => {
+      s = (s + 0x6d2b79f5) >>> 0;
+      let t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function valueNoise(n, scale, rnd) {
+    const pts = Math.ceil(n / scale) + 2;
+    const vals = new Float32Array(pts);
+    for (let k = 0; k < pts; k++) vals[k] = rnd() * 2 - 1;
+    const out = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const f = i / scale, k = f | 0, t = f - k, s = t * t * (3 - 2 * t);
+      out[i] = vals[k] * (1 - s) + vals[k + 1] * s;
+    }
+    return out;
+  }
+
+  function beginScrape(px, py, grab) {
+    snapshot();
+    setAxes();
+    if (!grab) {
+      const c = rulerCentreAt(px, py);
+      ruler.cx = c.x; ruler.cy = c.y;
+    }
+    ruler.parked = false;
+    ruler.active = true;
+    ruler.dir = 0;
+    ruler.rev = 0;
+    ruler.travel = 0;
+    ruler.halfLen = rulerHalfLen();
+    const ns = Math.ceil((2 * ruler.halfLen) / DS) + 1;
+    ruler.ns = ns;
+    ruler.bv = new Float32Array(ns * LAYERS);
+    ruler.bs = new Float32Array(ns * LAYERS);
+    ruler.bk0 = new Float32Array(ns * LAYERS);
+    ruler.bk1 = new Float32Array(ns * LAYERS);
+    ruler.bk2 = new Float32Array(ns * LAYERS);
+    ruler.bn = new Uint8Array(ns);
+    ruler.bt = new Float32Array(ns);
+    const rnd = seeded((Math.random() * 1e9) | 0);
+    const a = valueNoise(ns, 60, rnd), b = valueNoise(ns, 16, rnd), c = valueNoise(ns, 4.5, rnd), d = valueNoise(ns, 1.6, rnd);
+    const press = new Float32Array(ns);
+    for (let j = 0; j < ns; j++) press[j] = Math.min(1.85, Math.max(0.3, 1 + 0.3 * a[j] + 0.22 * b[j] + 0.17 * c[j] + 0.09 * d[j]));
+    ruler.press = press;
+  }
+
+  // Move the edge by `dn` cells along its normal.
+  function advanceRuler(dn) {
+    if (!ruler.active || dn === 0) return;
+    const s = dn > 0 ? 1 : -1;
+    if (ruler.dir !== 0 && s !== ruler.dir) {
+      // Small jitter backwards is ignored; a deliberate reversal leaves the bead behind.
+      ruler.rev += Math.abs(dn);
+      if (ruler.rev < 4) return;
+      dropBead();
+      dn = s * ruler.rev;
+    }
+    ruler.rev = 0;
+    ruler.dir = s;
+    ruler.lastDir = s;
+    let rem = Math.abs(dn);
+    while (rem > 1e-6) {
+      const step = Math.min(0.5, rem);
+      rem -= step;
+      ruler.cx += ruler.nx * step * s;
+      ruler.cy += ruler.ny * step * s;
+      ruler.travel += step;
+      sweepEdge();
+    }
+  }
+
+  function sweepEdge() {
+    visitId++;
+    const { ux, uy, cx, cy, halfLen, ns, press } = ruler;
+    const chatter = 1 + 0.07 * Math.sin(ruler.travel * 0.23 + 1.7 * Math.sin(ruler.travel * 0.031));
+    let minX = GW, minY = GH, maxX = -1, maxY = -1;
+    for (let j = 0; j < ns; j++) {
+      const t = -halfLen + j * DS;
+      const x = cx + ux * t, y = cy + uy * t;
+      if (x < 0 || y < 0 || x >= GW || y >= GH) continue;
+      const ix = x | 0, iy = y | 0, i = iy * GW + ix;
+      if (visit[i] === visitId) continue;
+      visit[i] = visitId;
+      if (processCell(i, j, press[j] * chatter)) {
+        if (ix < minX) minX = ix;
+        if (ix > maxX) maxX = ix;
+        if (iy < minY) minY = iy;
+        if (iy > maxY) maxY = iy;
+      }
+    }
+    if (maxX >= 0) markDirty(minX, minY, maxX, maxY);
+    spreadBead();
+  }
+
+  function processCell(i, j, p) {
+    const own = V[i], cv = ruler.bt[j];
+    if (own < 1e-5 && cv < 1e-5) return false;
+    const f = Math.min(1, (own + cv) * 0.9);
+    const d = D0 * p * (0.4 + 0.6 * f) + LAMBDA * cv;
+    let keep = Math.min(own, d * OWN);
+    const take = Math.min(cv, d - keep);
+    if (keep + take < d) keep = Math.min(own, d - take);
+    const excess = own - keep;
+    const ok0 = K0[i], ok1 = K1[i], ok2 = K2[i], os = S[i];
+    if (take > 0) beadTake(j, take);
+    else tv = 0;
+    const nv = keep + tv;
+    if (nv > 1e-7) {
+      const a = keep * os, t = a + tw;
+      if (t > 0) {
+        K0[i] = (ok0 * a + tk0) / t;
+        K1[i] = (ok1 * a + tk1) / t;
+        K2[i] = (ok2 * a + tk2) / t;
+      }
+      S[i] = (os * keep + tw) / nv;
+    }
+    V[i] = nv;
+    if (excess > 1e-7) beadPush(j, excess, ok0, ok1, ok2, os);
+    return true;
+  }
+
+  // Take `amt` off the top of sample j's bead. Leaves the volume in tv and the
+  // scatter-weighted sums in tw, tk0..tk2.
+  let tv = 0, tw = 0, tk0 = 0, tk1 = 0, tk2 = 0;
+  function beadTake(j, amt) {
+    const R = ruler, base = j * LAYERS;
+    tv = tw = tk0 = tk1 = tk2 = 0;
+    let need = amt;
+    while (need > 1e-9 && R.bn[j] > 0) {
+      const t = base + R.bn[j] - 1;
+      const lv = R.bv[t];
+      const g = Math.min(lv, need);
+      const w = g * R.bs[t];
+      tw += w;
+      tk0 += w * R.bk0[t];
+      tk1 += w * R.bk1[t];
+      tk2 += w * R.bk2[t];
+      tv += g;
+      need -= g;
+      R.bv[t] = lv - g;
+      if (R.bv[t] <= 1e-7) R.bn[j]--;
+    }
+    R.bt[j] = Math.max(0, R.bt[j] - tv);
+  }
+  const sameColour = (a0, a1, a2, b0, b1, b2) =>
+    Math.abs(Math.log((a0 + 0.02) / (b0 + 0.02))) + Math.abs(Math.log((a1 + 0.02) / (b1 + 0.02))) + Math.abs(Math.log((a2 + 0.02) / (b2 + 0.02))) < 0.55;
+  function mergeLayer(t, v, k0, k1, k2, s) {
+    const R = ruler;
+    const ov = R.bv[t], a = ov * R.bs[t], b = v * s, w = a + b;
+    if (w > 0) {
+      R.bk0[t] = (R.bk0[t] * a + k0 * b) / w;
+      R.bk1[t] = (R.bk1[t] * a + k1 * b) / w;
+      R.bk2[t] = (R.bk2[t] * a + k2 * b) / w;
+    }
+    R.bs[t] = (R.bs[t] * ov + s * v) / (ov + v);
+    R.bv[t] = ov + v;
+  }
+  // Put paint on top of sample j's bead, joining the top layer if it is the same colour.
+  function beadPush(j, v, k0, k1, k2, s) {
+    const R = ruler, base = j * LAYERS;
+    let n = R.bn[j];
+    R.bt[j] += v;
+    if (n > 0) {
+      const t = base + n - 1;
+      if (sameColour(R.bk0[t], R.bk1[t], R.bk2[t], k0, k1, k2)) { mergeLayer(t, v, k0, k1, k2, s); return; }
+    }
+    if (n === LAYERS) {
+      // Out of room: the two oldest layers blend together.
+      mergeLayer(base, R.bv[base + 1], R.bk0[base + 1], R.bk1[base + 1], R.bk2[base + 1], R.bs[base + 1]);
+      for (let l = 1; l < LAYERS - 1; l++) {
+        const a = base + l, b = a + 1;
+        R.bv[a] = R.bv[b]; R.bs[a] = R.bs[b]; R.bk0[a] = R.bk0[b]; R.bk1[a] = R.bk1[b]; R.bk2[a] = R.bk2[b];
+      }
+      n--;
+    }
+    const t = base + n;
+    R.bv[t] = v; R.bs[t] = s; R.bk0[t] = k0; R.bk1[t] = k1; R.bk2[t] = k2;
+    R.bn[j] = n + 1;
+  }
+  function spreadBead() {
+    const bt = ruler.bt;
+    for (let j = 0; j < ruler.ns - 1; j++) {
+      const a = bt[j], b = bt[j + 1];
+      if (a + b < 1e-6) continue;
+      const f = DIFF * (a - b);
+      if (f > 1e-6) {
+        beadTake(j, f);
+        if (tv > 0) beadPush(j + 1, tv, tk0 / tw, tk1 / tw, tk2 / tw, tw / tv);
+      } else if (f < -1e-6) {
+        beadTake(j + 1, -f);
+        if (tv > 0) beadPush(j, tv, tk0 / tw, tk1 / tw, tk2 / tw, tw / tv);
+      }
+    }
+  }
+
+  // Lifting the ruler leaves its bead as a ridge just ahead of the edge.
+  function dropBead() {
+    const R = ruler;
+    if (!R.bt) return;
+    const dir = R.dir || R.lastDir || 1;
+    let minX = GW, minY = GH, maxX = -1, maxY = -1;
+    for (let j = 0; j < R.ns; j++) {
+      if (R.bt[j] < 1e-5) continue;
+      beadTake(j, R.bt[j]);
+      const v = tv;
+      if (v < 1e-7) continue;
+      const blob = { k: [tk0 / tw, tk1 / tw, tk2 / tw], s: tw / tv };
+      const t = -R.halfLen + j * DS;
+      const pieces = [[0.7, 0.55], [1.8, 0.45]];
+      for (const [off, share] of pieces) {
+        const x = R.cx + R.ux * t + R.nx * off * dir;
+        const y = R.cy + R.uy * t + R.ny * off * dir;
+        if (x < 0 || y < 0 || x >= GW || y >= GH) continue;
+        const ix = x | 0, iy = y | 0;
+        addPaint(iy * GW + ix, v * share, blob, false);
+        if (ix < minX) minX = ix;
+        if (ix > maxX) maxX = ix;
+        if (iy < minY) minY = iy;
+        if (iy > maxY) maxY = iy;
+      }
+      R.bn[j] = 0;
+      R.bt[j] = 0;
+    }
+    if (maxX >= 0) markDirty(minX, minY, maxX, maxY);
+  }
+
+  function endScrape() {
+    if (!ruler.active) return;
+    dropBead();
+    ruler.active = false;
+    // Put the ruler away so the finished picture is clear; the next press picks it up again.
+    ruler.parked = false;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Rendering: paint field -> small RGBA canvas with gloss and a soft shadow,
+  // composited over a paper canvas drawn at screen resolution.
+  // ---------------------------------------------------------------------------
+  const canvas = document.getElementById('card-canvas');
+  const ctx = canvas.getContext('2d');
+  const paperCanvas = document.createElement('canvas');
+  const paintCanvas = document.createElement('canvas');
+  paintCanvas.width = GW; paintCanvas.height = GH;
+  const pctx = paintCanvas.getContext('2d');
+  const img = pctx.createImageData(GW, GH);
+  const px = img.data;
+
+  const LIGHT = (() => { const l = [-0.42, -0.62, 0.66], m = Math.hypot(...l); return l.map((c) => c / m); })();
+  const HALF = (() => { const h = [LIGHT[0], LIGHT[1], LIGHT[2] + 1], m = Math.hypot(...h); return h.map((c) => c / m); })();
+  const COVER_K = 30, HS = 9, SPEC_P = 56;
+  const SH_OFF = 3 * GW + 2;
+
+  function renderPaint() {
+    if (dX1 < dX0) return;
+    const x0 = Math.max(0, dX0 - 4), y0 = Math.max(0, dY0 - 4);
+    const x1 = Math.min(GW - 1, dX1 + 4), y1 = Math.min(GH - 1, dY1 + 4);
+    dX0 = GW; dY0 = GH; dX1 = -1; dY1 = -1;
+    const [lx, ly, lz] = LIGHT, [hx, hy, hz] = HALF;
+    for (let y = y0; y <= y1; y++) {
+      const row = y * GW;
+      const up = y > 0 ? -GW : 0, dn = y < GH - 1 ? GW : 0;
+      for (let x = x0; x <= x1; x++) {
+        const i = row + x, o = i * 4;
+        const v = V[i];
+        let sh = 0;
+        if (x >= 2 && y >= 3) {
+          const sv = V[i - SH_OFF] - v - 0.08;
+          if (sv > 0) sh = Math.min(1, sv * 1.6) * 0.17;
+        }
+        if (v < 1e-4) {
+          if (sh > 0) { px[o] = 24; px[o + 1] = 22; px[o + 2] = 20; px[o + 3] = sh * 255; }
+          else px[o + 3] = 0;
+          continue;
+        }
+        const a = 1 - Math.exp(-v * COVER_K);
+        const gx = (V[x < GW - 1 ? i + 1 : i] - V[x > 0 ? i - 1 : i]) * HS;
+        const gy = (V[i + dn] - V[i + up]) * HS;
+        const inv = 1 / Math.sqrt(gx * gx + gy * gy + 4);
+        const nx = -gx * inv, ny = -gy * inv, nz = 2 * inv;
+        let shade = 0.32 + (0.68 * (nx * lx + ny * ly + nz * lz)) / lz;
+        if (shade < 0.25) shade = 0.25;
+        const ndh = nx * hx + ny * hy + nz * hz;
+        const spec = ndh > 0 ? Math.pow(ndh, SPEC_P) * Math.min(1, v * 2.2) * 0.9 : 0;
+        const outA = a + sh * (1 - a);
+        const k = a / outA;
+        px[o] = toByte((ksToR(K0[i]) * shade + spec) * k);
+        px[o + 1] = toByte((ksToR(K1[i]) * shade + spec) * k);
+        px[o + 2] = toByte((ksToR(K2[i]) * shade + spec) * k);
+        px[o + 3] = outA * 255;
+      }
+    }
+    pctx.putImageData(img, 0, 0, x0, y0, x1 - x0 + 1, y1 - y0 + 1);
+  }
+
+  // Paper: fibre texture, template guide marks and the hand-lettered message.
+  let fibre = null;
+  function fibreTile() {
+    if (fibre) return fibre;
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const x = c.getContext('2d');
+    const rnd = seeded(7);
+    for (let k = 0; k < 900; k++) {
+      x.fillStyle = `rgba(${rnd() < 0.5 ? '90,80,60' : '255,255,255'},${0.05 + rnd() * 0.07})`;
+      x.fillRect(rnd() * 128, rnd() * 128, 1 + rnd() * 2, 1);
+    }
+    fibre = c;
+    return c;
+  }
+
+  const LETTER_COLOURS = ['#3fb3a6', '#f07ca6', '#f3b43c', '#5b8fd6', '#a27ad6', '#f08a4b', '#64bb6a'];
+
+  function drawPaper(c, W, H) {
+    const s = W / GW;
+    c.save();
+    c.fillStyle = '#fbfbf7';
+    c.fillRect(0, 0, W, H);
+    c.fillStyle = c.createPattern(fibreTile(), 'repeat');
+    c.fillRect(0, 0, W, H);
+    // Guide marks, printed in pale grey like the craft kit's card.
+    const tpl = TEMPLATES[state.template];
+    c.fillStyle = c.strokeStyle = '#dedcd5';
+    c.lineCap = c.lineJoin = 'round';
+    for (const it of tpl.items) {
+      if (it.t === 'dot') {
+        c.beginPath();
+        c.ellipse(it.x * s, it.y * s, it.r * 0.85 * s, it.r * 0.78 * s, 0, 0, Math.PI * 2);
+        c.fill();
+      } else {
+        for (let k = 1; k < it.pts.length; k++) {
+          const [ax, ay, ar] = it.pts[k - 1], [bx, by] = it.pts[k];
+          c.lineWidth = ar * 1.5 * s;
+          c.beginPath();
+          c.moveTo(ax * s, ay * s);
+          c.lineTo(bx * s, by * s);
+          c.stroke();
+        }
+      }
+    }
+    drawMessage(c, W, H);
+    c.restore();
+  }
+
+  function drawMessage(c, W, H) {
+    const msg = state.msg.trim().toUpperCase().replace(/\s+/g, ' ');
+    if (!msg) return;
+    const words = msg.split(' ');
+    let size = W * 0.088;
+    const font = (sz) => `800 ${sz}px Sniglet, "Arial Rounded MT Bold", system-ui, sans-serif`;
+    c.font = font(size);
+    const track = 0.06;
+    const width = (str) => c.measureText(str).width + str.length * size * track;
+    let lines = [msg];
+    if (width(msg) > W * 0.8 && words.length > 1) {
+      let best = null;
+      for (let k = 1; k < words.length; k++) {
+        const a = words.slice(0, k).join(' '), b = words.slice(k).join(' ');
+        const m = Math.max(width(a), width(b));
+        if (!best || m < best.m) best = { m, lines: [a, b] };
+      }
+      lines = best.lines;
+    }
+    const widest = Math.max(...lines.map(width));
+    if (widest > W * 0.82) {
+      size *= (W * 0.82) / widest;
+      c.font = font(size);
+    }
+    c.textBaseline = 'alphabetic';
+    let n = 0;
+    const top = H * 0.045;
+    lines.forEach((line, li) => {
+      const lw = width(line);
+      let x = (W - lw) / 2;
+      const y = top + size * (0.95 + li * 1.12);
+      for (const ch of line) {
+        const w = c.measureText(ch).width;
+        if (ch !== ' ') {
+          const r = seeded(n * 31 + 5);
+          c.save();
+          c.translate(x + w / 2, y + (r() - 0.5) * size * 0.06);
+          c.rotate((r() - 0.5) * 0.12);
+          c.fillStyle = LETTER_COLOURS[n % LETTER_COLOURS.length];
+          c.fillText(ch, -w / 2, 0);
+          c.restore();
+          n++;
+        }
+        x += w + size * track;
+      }
+    });
+    // Little confetti curls around the lettering.
+    const blockW = widest > W * 0.82 ? W * 0.82 : widest;
+    const curl = (x, y, sz, col, rot) => {
+      c.save();
+      c.translate(x, y);
+      c.rotate(rot);
+      c.strokeStyle = col;
+      c.lineWidth = Math.max(1.2, sz * 0.16);
+      c.lineCap = 'round';
+      c.beginPath();
+      c.moveTo(-sz, sz * 0.3);
+      c.bezierCurveTo(-sz * 0.2, sz * 0.5, sz * 0.3, -sz * 0.6, -sz * 0.1, -sz * 0.45);
+      c.bezierCurveTo(-sz * 0.55, -sz * 0.3, -sz * 0.1, sz * 0.4, sz, sz * 0.05);
+      c.stroke();
+      c.restore();
+    };
+    const cy1 = top + size * 0.55;
+    curl(W / 2 - blockW / 2 - size * 0.55, cy1, size * 0.42, '#f07ca6', -0.2);
+    curl(W / 2 + blockW / 2 + size * 0.55, cy1 - size * 0.1, size * 0.36, '#3fb3a6', 0.3);
+    curl(W / 2 + size * 0.2, top - size * 0.1, size * 0.38, '#a27ad6', 0.1);
+  }
+
+  let cssW = 0, cssH = 0, dpr = 1;
+  function resize() {
+    const r = canvas.getBoundingClientRect();
+    if (!r.width) return;
+    dpr = Math.min(3, window.devicePixelRatio || 1);
+    cssW = r.width; cssH = r.height;
+    const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w; canvas.height = h;
+      paperCanvas.width = w; paperCanvas.height = h;
+    }
+    redrawPaper();
+  }
+  function redrawPaper() {
+    if (!paperCanvas.width) return;
+    drawPaper(paperCanvas.getContext('2d'), paperCanvas.width, paperCanvas.height);
+    kick();
+  }
+
+  function drawRuler(c, s, cx, cy, halfLen, dir, alpha, bead) {
+    const a = (ruler.angle * Math.PI) / 180;
+    c.save();
+    c.globalAlpha = alpha;
+    c.translate(cx * s, cy * s);
+    c.rotate(a);
+    const L = halfLen * s, bw = BODY * s, back = dir >= 0 ? -1 : 1;
+    // Bead of pushed paint, ahead of the edge.
+    if (bead && ruler.bt) {
+      const fwd = -back;
+      for (let j = 0; j < ruler.ns; j++) {
+        const v = ruler.bt[j];
+        if (v < 0.004 || !ruler.bn[j]) continue;
+        const depth = Math.min(12, Math.sqrt(v) * 4.4) * s;
+        const top = j * LAYERS + ruler.bn[j] - 1;
+        const r = toByte(ksToR(ruler.bk0[top])), g = toByte(ksToR(ruler.bk1[top])), b = toByte(ksToR(ruler.bk2[top]));
+        c.fillStyle = `rgba(${r},${g},${b},${Math.min(1, 0.5 + v * 1.5)})`;
+        const x = (-halfLen + j * DS) * s;
+        c.fillRect(x - DS * s * 0.5, 0, DS * s + 0.8, fwd * depth);
+      }
+    }
+    // Clear plastic body.
+    const y0 = back < 0 ? -bw : 0;
+    c.fillStyle = 'rgba(206, 228, 238, 0.32)';
+    c.fillRect(-L, y0, 2 * L, bw);
+    c.fillStyle = 'rgba(255, 255, 255, 0.28)';
+    c.fillRect(-L, back * bw * 0.62, 2 * L, back * bw * 0.12);
+    c.lineWidth = Math.max(1, 0.9 * dpr);
+    c.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+    c.beginPath(); c.moveTo(-L, back * bw); c.lineTo(L, back * bw); c.stroke();
+    c.strokeStyle = 'rgba(28, 44, 52, 0.75)';
+    c.lineWidth = Math.max(1.2, 1.4 * dpr);
+    c.beginPath(); c.moveTo(-L, 0); c.lineTo(L, 0); c.stroke();
+    // Millimetre ticks with centimetre numbers, measured from the left end.
+    c.strokeStyle = 'rgba(28, 44, 52, 0.7)';
+    c.fillStyle = 'rgba(28, 44, 52, 0.8)';
+    c.lineWidth = Math.max(0.8, 0.75 * dpr);
+    c.font = `600 ${Math.max(8, 8 * s)}px Figtree, system-ui, sans-serif`;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.beginPath();
+    const mm = CELLS_PER_MM;
+    const count = Math.floor((2 * halfLen) / mm);
+    for (let k = 0; k <= count; k++) {
+      const x = (-halfLen + k * mm) * s;
+      const len = (k % 10 === 0 ? 9 : k % 5 === 0 ? 6 : 3.5) * s;
+      c.moveTo(x, 0);
+      c.lineTo(x, back * len);
+    }
+    c.stroke();
+    for (let k = 10; k < count; k += 10) {
+      const x = (-halfLen + k * mm) * s;
+      c.fillText(String(k / 10), x, back * 16 * s);
+    }
+    c.restore();
+  }
+
+  function composite() {
+    if (!canvas.width) return;
+    const W = canvas.width, H = canvas.height, s = W / GW;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(paperCanvas, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(paintCanvas, 0, 0, W, H);
+    if (ruler.active) {
+      drawRuler(ctx, s, ruler.cx, ruler.cy, ruler.halfLen, ruler.dir || ruler.lastDir, 1, true);
+    } else if (anim && anim.kind === 'scrape' && ruler.parked) {
+      drawRuler(ctx, s, ruler.cx, ruler.cy, rulerHalfLen(), 1, 0.85, false);
+    } else if (state.mode === 'scrape' && !anim) {
+      if (hover) {
+        const g = grabTest(hover.x, hover.y);
+        const c = g ? { x: ruler.cx, y: ruler.cy } : rulerCentreAt(hover.x, hover.y);
+        drawRuler(ctx, s, c.x, c.y, rulerHalfLen(), g ? ruler.lastDir : 1, 0.7, false);
+      } else if (ruler.parked) {
+        drawRuler(ctx, s, ruler.cx, ruler.cy, rulerHalfLen(), ruler.lastDir, 0.85, false);
+      }
+    } else if (state.mode === 'squeeze' && hover && !sq.active) {
+      ctx.strokeStyle = 'rgba(40, 40, 40, 0.45)';
+      ctx.lineWidth = Math.max(1, dpr);
+      ctx.setLineDash([3 * dpr, 3 * dpr]);
+      ctx.beginPath();
+      ctx.arc(hover.x * s, hover.y * s, state.size * s, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  let raf = 0;
+  function kick() { if (!raf) raf = requestAnimationFrame(frame); }
+  function frame(now) {
+    raf = 0;
+    let again = false;
+    if (sq.active) { growSqueeze(now); again = true; }
+    if (anim) { stepAnim(now); again = true; }
+    renderPaint();
+    composite();
+    if (again) kick();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Squeeze tool: hold still and the dot swells, drag and you pipe a line,
+  // pause mid-line and a blob builds up there, like a real puffy-paint tube.
+  // ---------------------------------------------------------------------------
+  const sq = { active: false };
+  const smooth = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+  function beginSqueeze(p) {
+    snapshot();
+    Object.assign(sq, {
+      active: true, sid: ++strokeSeq, paint: paintFor(state.paint),
+      hx: p.x, hy: p.y, lx: p.x, ly: p.y, holdT: performance.now(),
+      first: true, moved: false, lastR: 0,
+    });
+    growSqueeze(sq.holdT);
+  }
+  function holdRadius(t) {
+    const S0 = state.size;
+    if (sq.first) return S0 * (0.45 + 0.55 * smooth(t / 0.14)) + S0 * 0.45 * smooth((t - 0.3) / 1.4);
+    const lr = S0 * 0.62;
+    return t < 0.18 ? lr : lr + (S0 * 1.45 - lr) * smooth((t - 0.18) / 1.3);
+  }
+  function growSqueeze(now) {
+    const r = holdRadius((now - sq.holdT) / 1000);
+    if (r > sq.lastR + 0.04) {
+      stampDome(sq.hx, sq.hy, r, sq.paint, sq.sid);
+      sq.lastR = r;
+    }
+  }
+  function moveSqueeze(p) {
+    if (!sq.moved && Math.hypot(p.x - sq.hx, p.y - sq.hy) < 2) return;
+    if (Math.hypot(p.x - sq.lx, p.y - sq.ly) < 0.6) return;
+    const lr = state.size * 0.62;
+    stampSegment(sq.lx, sq.ly, lr, p.x, p.y, lr, sq.paint, sq.sid);
+    sq.moved = true;
+    sq.first = false;
+    sq.lx = sq.hx = p.x;
+    sq.ly = sq.hy = p.y;
+    sq.holdT = performance.now();
+    sq.lastR = lr;
+  }
+  function endSqueeze() {
+    if (!sq.active) return;
+    if (!sq.moved && sq.lastR < state.size * 0.85) stampDome(sq.hx, sq.hy, state.size * 0.85, sq.paint, sq.sid);
+    sq.active = false;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Card templates, laid out in grid cells (400 x 600).
+  // ---------------------------------------------------------------------------
+  const dot = (x, y, r, c) => ({ t: 'dot', x, y, r, c });
+  const line = (pts, c) => ({ t: 'line', pts, c });
+  function wave(x0, x1, y, amp, cycles, phase, r, taper = 0.4) {
+    const pts = [];
+    const n = Math.max(2, Math.ceil((x1 - x0) / 2));
+    for (let k = 0; k <= n; k++) {
+      const f = k / n;
+      pts.push([x0 + (x1 - x0) * f, y + amp * Math.sin((f * cycles + phase) * Math.PI * 2), r * (1 - taper + taper * Math.sin(Math.PI * f))]);
+    }
+    return pts;
+  }
+  function arc(cx, cy, R, a0, a1, r, taper = 0.35) {
+    const pts = [];
+    const n = Math.max(2, Math.ceil((Math.abs(a1 - a0) * Math.PI / 180 * R) / 2));
+    for (let k = 0; k <= n; k++) {
+      const f = k / n, a = ((a0 + (a1 - a0) * f) * Math.PI) / 180;
+      pts.push([cx + R * Math.cos(a), cy + R * Math.sin(a), r * (1 - taper + taper * Math.sin(Math.PI * f))]);
+    }
+    return pts;
+  }
+
+  const cakeOrange = wave(116, 292, 216, 7, 1.25, 0, 6.6, 0.3).concat([[298, 216, 5.4], [303, 208, 4.8], [305, 200, 4.2]]);
+  const TEMPLATES = {
+    cake: {
+      name: 'Birthday cake',
+      msg: 'Happy Birthday',
+      // Three pulls, stopping between tiers so each layer gets a crisp edge.
+      scrape: [{ from: 146, to: 334 }, { from: 338, to: 452 }, { from: 456, to: 660 }],
+      items: [
+        dot(148, 171, 10.5, 'red'), dot(200, 166, 10.5, 'red'), dot(252, 171, 10.5, 'red'),
+        dot(148, 190, 10, 'yellow'), dot(200, 185, 10, 'yellow'), dot(252, 190, 10, 'yellow'),
+        line(cakeOrange, 'orange'),
+        dot(146, 252, 9, 'blue'), dot(200, 248, 9.5, 'green'), dot(254, 252, 9, 'blue'),
+        line(wave(72, 340, 344, 6, 0.9, 0.15, 10.5, 0.45), 'yellow'),
+        dot(118, 384, 7, 'orange'), dot(159, 380, 8, 'yellow'), dot(200, 377, 7, 'orange'), dot(241, 374, 8, 'yellow'), dot(282, 371, 7, 'orange'),
+        line(wave(58, 346, 466, 8, 1.6, 0.55, 8.5, 0.35), 'red'),
+        dot(192, 520, 7, 'orange'), dot(262, 512, 7, 'orange'),
+        dot(110, 532, 9, 'yellow'), dot(320, 504, 9, 'yellow'),
+      ],
+    },
+    jelly: {
+      name: 'Jellyfish',
+      msg: 'Sea you soon',
+      scrape: [{ from: 140, to: 660 }],
+      items: [
+        line(arc(196, 250, 82, 196, 344, 8, 0.3), 'pink'),
+        line(arc(196, 252, 54, 208, 332, 5.5, 0.3), 'grape'),
+        dot(136, 236, 6, 'grape'), dot(158, 240, 5.5, 'white'), dot(178, 242, 6, 'sky'), dot(200, 243, 5.5, 'white'),
+        dot(220, 242, 6, 'sky'), dot(240, 240, 5.5, 'white'), dot(260, 236, 6, 'grape'),
+        line(arc(318, 400, 40, 196, 344, 5.5, 0.3), 'sky'),
+        dot(290, 392, 4.5, 'white'), dot(306, 395, 4.5, 'blue'), dot(322, 396, 4.5, 'white'), dot(338, 393, 4.5, 'blue'),
+        line(arc(84, 372, 36, 196, 344, 5, 0.3), 'orange'),
+        dot(60, 365, 4, 'yellow'), dot(76, 368, 4.5, 'white'), dot(92, 368, 4.5, 'yellow'), dot(107, 365, 4, 'white'),
+        dot(330, 214, 3.2, 'white'), dot(350, 250, 2.6, 'white'), dot(52, 250, 3, 'white'), dot(250, 330, 2.6, 'white'),
+      ],
+    },
+    fire: {
+      name: 'Campfire',
+      msg: 'Stay cozy',
+      scrape: [{ from: 504, to: -60 }],
+      items: [
+        line([[112, 552, 7.5], [288, 520, 7.5]], 'cocoa'),
+        line([[112, 520, 7.5], [288, 552, 7.5]], 'cocoa'),
+        dot(142, 486, 6.5, 'red'), dot(164, 481, 8, 'orange'), dot(188, 477, 9, 'yellow'),
+        dot(212, 477, 9, 'yellow'), dot(236, 481, 8, 'orange'), dot(258, 486, 6.5, 'red'),
+        dot(154, 457, 5.5, 'red'), dot(178, 452, 6.5, 'orange'), dot(200, 447, 7.5, 'yellow'),
+        dot(222, 452, 6.5, 'orange'), dot(246, 457, 5.5, 'red'),
+        dot(200, 425, 4.5, 'white'),
+        dot(150, 360, 2.6, 'orange'), dot(232, 330, 2.4, 'yellow'), dot(268, 372, 2.2, 'red'), dot(182, 300, 2.2, 'yellow'),
+      ],
+    },
+    blank: { name: 'Blank card', msg: '', scrape: null, items: [] },
+  };
+
+  // ---------------------------------------------------------------------------
+  // Animations: "Squeeze it for me" pipes the template, "Scrape it for me" pulls
+  // the ruler down (or up) the card.
+  // ---------------------------------------------------------------------------
+  let anim = null;
+  const busy = () => !!anim;
+
+  function squeezeJobs(items) {
+    return items.map((it) => {
+      const p = PAINT[it.c];
+      if (it.t === 'dot') return { t: 'dot', it, p, dur: 90 + it.r * 6 };
+      let len = 0;
+      for (let k = 1; k < it.pts.length; k++) len += Math.hypot(it.pts[k][0] - it.pts[k - 1][0], it.pts[k][1] - it.pts[k - 1][1]);
+      return { t: 'line', it, p, dur: 140 + len * 1.3 };
+    });
+  }
+  function runJob(job, f) {
+    if (!job.sid) { job.sid = ++strokeSeq; job.k = 0; }
+    const it = job.it;
+    if (job.t === 'dot') {
+      stampDome(it.x, it.y, it.r * (0.35 + 0.65 * smooth(f)), job.p, job.sid);
+      return;
+    }
+    const pts = it.pts;
+    if (job.k === 0) stampDome(pts[0][0], pts[0][1], pts[0][2], job.p, job.sid);
+    const upto = f * (pts.length - 1);
+    while (job.k < Math.floor(upto)) {
+      const a = pts[job.k], b = pts[job.k + 1];
+      stampSegment(a[0], a[1], a[2], b[0], b[1], b[2], job.p, job.sid);
+      job.k++;
+    }
+  }
+  function squeezeTemplate(instant) {
+    const jobs = squeezeJobs(TEMPLATES[state.template].items);
+    if (!jobs.length) return;
+    if (instant) {
+      for (const j of jobs) runJob(j, 1);
+      parkRuler();
+      kick();
+      return;
+    }
+    snapshot();
+    anim = { kind: 'squeeze', jobs, idx: 0, t0: performance.now() };
+    syncButtons();
+    kick();
+  }
+  function scrapePlan() {
+    const tpl = TEMPLATES[state.template];
+    if (tpl.scrape) return tpl.scrape;
+    const top = topOfPaint();
+    return [{ from: Math.max(4, (top < 0 ? 40 : top) - 12), to: GH + 60 }];
+  }
+  function startStage() {
+    const st = anim.stages[anim.si];
+    if (anim.si === 0) beginScrape(GW / 2, st.from, false);
+    else {
+      // Later pulls carry on from the same press; only the ruler is lifted.
+      ruler.cx = GW / 2; ruler.cy = st.from;
+      ruler.parked = false; ruler.active = true; ruler.dir = 0; ruler.rev = 0;
+    }
+    anim.pos = st.from;
+    anim.from = st.from;
+    anim.to = st.to;
+    anim.dur = 500 + Math.abs(st.to - st.from) * 3.4;
+    anim.t0 = performance.now();
+  }
+  function autoScrape() {
+    if (busy()) return;
+    setAngle(0);
+    setLen('full');
+    setMode('scrape');
+    anim = { kind: 'scrape', stages: scrapePlan(), si: 0, pause: 0 };
+    startStage();
+    syncButtons();
+    kick();
+  }
+  function stepAnim(now) {
+    if (anim.kind === 'squeeze') {
+      let t = now - anim.t0;
+      while (anim && anim.idx < anim.jobs.length) {
+        const job = anim.jobs[anim.idx];
+        const f = Math.min(1, t / job.dur);
+        runJob(job, f);
+        if (f < 1) return;
+        t -= job.dur + 30;
+        anim.t0 += job.dur + 30;
+        anim.idx++;
+        if (t < 0) return;
+      }
+      anim = null;
+      parkRuler();
+      const st = scrapePlan()[0];
+      setHint(`Paint's on. Now <b>pull the ruler ${st.to < st.from ? 'up' : 'down'}</b> through it, or tap <b>Scrape it for me</b>.`);
+      syncButtons();
+    } else {
+      if (anim.pause) {
+        if (now < anim.pause) return;
+        anim.pause = 0;
+        startStage();
+        return;
+      }
+      const f = Math.min(1, (now - anim.t0) / anim.dur);
+      const e = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
+      const pos = anim.from + (anim.to - anim.from) * e;
+      advanceRuler(pos - anim.pos);
+      anim.pos = pos;
+      if (f < 1) return;
+      dropBead();
+      if (++anim.si < anim.stages.length) {
+        // Lift: the bead stays behind as a ridge, then the ruler goes down again.
+        ruler.active = false;
+        ruler.parked = true;
+        ruler.cx = GW / 2; ruler.cy = anim.stages[anim.si].from;
+        anim.pause = now + 380;
+        return;
+      }
+      anim = null;
+      ruler.active = true;
+      endScrape();
+      const many = TEMPLATES[state.template].scrape && TEMPLATES[state.template].scrape.length > 1;
+      setHint(many
+        ? 'Ta-da. The ruler stopped between tiers to keep the edges crisp. Your turn: <b>Wipe paint</b> and squeeze your own.'
+        : 'Ta-da. Your turn: <b>Wipe paint</b>, squeeze new blobs, and pull the ruler any way you like.');
+      syncButtons();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Undo
+  // ---------------------------------------------------------------------------
+  const undoStack = [];
+  function snapshot() {
+    const snap = new Float32Array(N * 5);
+    snap.set(V, 0); snap.set(K0, N); snap.set(K1, 2 * N); snap.set(K2, 3 * N); snap.set(S, 4 * N);
+    undoStack.push(snap);
+    if (undoStack.length > 8) undoStack.shift();
+    syncButtons();
+  }
+  function undo() {
+    if (busy() || sq.active || ruler.active) return;
+    const snap = undoStack.pop();
+    if (!snap) return;
+    V.set(snap.subarray(0, N)); K0.set(snap.subarray(N, 2 * N)); K1.set(snap.subarray(2 * N, 3 * N));
+    K2.set(snap.subarray(3 * N, 4 * N)); S.set(snap.subarray(4 * N));
+    markAll();
+    if (!ruler.active) parkRuler();
+    syncButtons();
+    kick();
+  }
+  function wipe(withSnapshot = true) {
+    if (withSnapshot) snapshot();
+    V.fill(0);
+    markAll();
+    parkRuler();
+    kick();
+  }
+
+  // ---------------------------------------------------------------------------
+  // UI state and wiring
+  // ---------------------------------------------------------------------------
+  const state = { mode: 'scrape', paint: 'red', size: 10, template: 'cake', msg: TEMPLATES.cake.msg, msgEdited: false };
+  const $ = (id) => document.getElementById(id);
+  const hintEl = $('hint');
+  function setHint(html) { hintEl.innerHTML = html; }
+  function defaultHint() {
+    if (state.mode === 'squeeze') setHint('<b>Hold</b> to squeeze a dot (it grows the longer you hold). <b>Drag</b> to pipe a line.');
+    else setHint('Press anywhere on the card and <b>drag</b>. The ruler pushes the paint the way you pull it.');
+  }
+
+  function setMode(m) {
+    if (state.mode === m) return;
+    state.mode = m;
+    $('mode-squeeze').setAttribute('aria-pressed', String(m === 'squeeze'));
+    $('mode-scrape').setAttribute('aria-pressed', String(m === 'scrape'));
+    $('squeeze-opts').hidden = m !== 'squeeze';
+    $('scrape-opts').hidden = m !== 'scrape';
+    canvas.classList.toggle('grab', m === 'scrape');
+    defaultHint();
+    kick();
+  }
+  function setAngle(a) {
+    a = Math.max(-90, Math.min(90, Math.round(a / 5) * 5));
+    if (a === -90) a = 90;
+    if (a !== ruler.angle) {
+      ruler.angle = a;
+      setAxes();
+      parkRuler();
+    }
+    $('angle').value = String(a);
+    $('angle-out').textContent = `${a}°`;
+    for (const b of $('angle-chips').children) b.setAttribute('aria-pressed', String(Number(b.dataset.angle) === a));
+    kick();
+  }
+  function setLen(l) {
+    ruler.len = l;
+    for (const b of $('len-chips').children) b.setAttribute('aria-pressed', String(b.dataset.len === l));
+    kick();
+  }
+  function setSize(v) {
+    state.size = Math.max(4, Math.min(22, v));
+    $('size').value = String(state.size);
+    $('size-out').textContent = String(state.size);
+    kick();
+  }
+  function setPaint(id) {
+    state.paint = id;
+    for (const b of $('swatches').children) b.setAttribute('aria-pressed', String(b.dataset.paint === id));
+  }
+  function setTemplate(id, { squeeze = false } = {}) {
+    state.template = id;
+    for (const b of $('templates').children) b.setAttribute('aria-pressed', String(b.dataset.tpl === id));
+    if (!state.msgEdited) {
+      state.msg = TEMPLATES[id].msg;
+      $('msg').value = state.msg;
+    }
+    redrawPaper();
+    syncButtons();
+    if (squeeze) {
+      wipe(true);
+      if (TEMPLATES[id].items.length) {
+        squeezeTemplate(false);
+        setHint('Squeezing the paint onto the guide marks…');
+      } else {
+        setMode('squeeze');
+        setHint('Clean card. <b>Pick a colour</b> and squeeze some blobs, then switch to the ruler.');
+      }
+    }
+  }
+  function syncButtons() {
+    const b = busy();
+    $('undo').disabled = b || undoStack.length === 0;
+    $('clear').disabled = b;
+    $('auto-squeeze').disabled = b || TEMPLATES[state.template].items.length === 0;
+    $('auto-scrape').disabled = b;
+    $('save').disabled = b;
+  }
+
+  // Swatches and templates
+  for (const p of PAINTS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'swatch';
+    b.dataset.paint = p.id;
+    b.style.setProperty('--c', p.hex);
+    b.title = p.name;
+    b.setAttribute('aria-label', p.name);
+    b.addEventListener('click', () => { setPaint(p.id); setMode('squeeze'); });
+    $('swatches').appendChild(b);
+  }
+  for (const [id, t] of Object.entries(TEMPLATES)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip';
+    b.dataset.tpl = id;
+    b.textContent = t.name;
+    b.addEventListener('click', () => { if (!busy()) setTemplate(id, { squeeze: true }); });
+    $('templates').appendChild(b);
+  }
+
+  $('mode-squeeze').addEventListener('click', () => setMode('squeeze'));
+  $('mode-scrape').addEventListener('click', () => setMode('scrape'));
+  $('size').addEventListener('input', (e) => setSize(Number(e.target.value)));
+  $('angle').addEventListener('input', (e) => setAngle(Number(e.target.value)));
+  for (const b of $('angle-chips').children) b.addEventListener('click', () => setAngle(Number(b.dataset.angle)));
+  for (const b of $('len-chips').children) b.addEventListener('click', () => setLen(b.dataset.len));
+  $('auto-squeeze').addEventListener('click', () => {
+    if (busy()) return;
+    wipe(false);
+    squeezeTemplate(false);
+    setHint('Squeezing the paint onto the guide marks…');
+  });
+  $('auto-scrape').addEventListener('click', autoScrape);
+  $('undo').addEventListener('click', undo);
+  $('clear').addEventListener('click', () => {
+    if (busy()) return;
+    wipe(true);
+    setMode('squeeze');
+    setHint('Clean card. <b>Pick a colour</b> and squeeze some blobs, then switch to the ruler.');
+  });
+  $('msg').addEventListener('input', (e) => {
+    state.msg = e.target.value;
+    state.msgEdited = true;
+    redrawPaper();
+  });
+
+  // Pointer input on the card
+  let activePointer = null, rect = null, hover = null, lastP = null;
+  const toGrid = (e) => ({ x: ((e.clientX - rect.left) / rect.width) * GW, y: ((e.clientY - rect.top) / rect.height) * GH });
+
+  // Pressing on the resting ruler picks it up where it lies.
+  function grabTest(x, y) {
+    if (!ruler.parked) return false;
+    const dx = x - ruler.cx, dy = y - ruler.cy;
+    const along = dx * ruler.ux + dy * ruler.uy;
+    const across = (dx * ruler.nx + dy * ruler.ny) * (ruler.lastDir >= 0 ? -1 : 1);
+    return Math.abs(along) <= rulerHalfLen() && across >= -6 && across <= BODY + 2;
+  }
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (busy() || activePointer !== null || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    e.preventDefault();
+    rect = canvas.getBoundingClientRect();
+    activePointer = e.pointerId;
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* capture is optional */ }
+    const p = toGrid(e);
+    hover = null;
+    if (state.mode === 'squeeze') beginSqueeze(p);
+    else {
+      beginScrape(p.x, p.y, grabTest(p.x, p.y));
+      canvas.classList.add('grabbing');
+      lastP = p;
+    }
+    kick();
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== activePointer) {
+      if (e.pointerType !== 'touch' && !busy()) {
+        rect = canvas.getBoundingClientRect();
+        hover = toGrid(e);
+        kick();
+      }
+      return;
+    }
+    const list = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [];
+    for (const ev of list.length ? list : [e]) {
+      const p = toGrid(ev);
+      if (state.mode === 'squeeze') moveSqueeze(p);
+      else if (ruler.active) {
+        advanceRuler((p.x - lastP.x) * ruler.nx + (p.y - lastP.y) * ruler.ny);
+        lastP = p;
+      }
+    }
+    kick();
+  });
+  function release(e) {
+    if (e.pointerId !== activePointer) return;
+    activePointer = null;
+    if (sq.active) endSqueeze();
+    if (ruler.active) endScrape();
+    canvas.classList.remove('grabbing');
+    kick();
+  }
+  canvas.addEventListener('pointerup', release);
+  canvas.addEventListener('pointercancel', release);
+  canvas.addEventListener('pointerleave', () => { hover = null; kick(); });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.target instanceof HTMLInputElement && e.target.type === 'text') return;
+    const k = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); undo(); return; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (k === 's') setMode('squeeze');
+    else if (k === 'r') setMode('scrape');
+    else if (k === 'q') setAngle(ruler.angle - 15);
+    else if (k === 'e') setAngle(ruler.angle + 15);
+    else if (k === '[') setSize(state.size - 1);
+    else if (k === ']') setSize(state.size + 1);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Save picture. Inside a Claude artifact the page asks the viewer to save
+  // through the downloads capability; as a normal web page it downloads directly.
+  // ---------------------------------------------------------------------------
+  const toastEl = $('toast');
+  let toastTimer = 0;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
+  }
+  const hosted = !!(window.claude && typeof window.claude.use === 'function');
+  let downloads = null;
+  if (hosted) {
+    window.claude.use('downloads').then((d) => { downloads = d; $('save').hidden = !d; }, () => {});
+  } else {
+    $('save').hidden = false;
+  }
+  function exportBlob() {
+    const W = 1200, H = 1800;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    drawPaper(x, W, H);
+    markAll();
+    renderPaint();
+    x.imageSmoothingEnabled = true;
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(paintCanvas, 0, 0, W, H);
+    return new Promise((res) => c.toBlob(res, 'image/png'));
+  }
+  $('save').addEventListener('click', async () => {
+    const blob = await exportBlob();
+    if (!blob) { toast('Could not make the picture'); return; }
+    const filename = `${(state.msg.trim() || 'squeeze-and-scrape').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'card'}.png`;
+    if (downloads) {
+      try {
+        await downloads.save({ filename, data: blob });
+        toast('Saved');
+      } catch (err) {
+        toast(err && err.code === 'declined' ? 'Save cancelled' : 'Saving is not available here');
+      }
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('Saved');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Boot: open on the birthday cake with the paint already squeezed, the ruler
+  // resting above it, ready to pull.
+  // ---------------------------------------------------------------------------
+  setPaint('red');
+  setSize(10);
+  setLen('full');
+  setAngle(0);
+  $('msg').value = state.msg;
+  for (const b of $('templates').children) b.setAttribute('aria-pressed', String(b.dataset.tpl === state.template));
+  $('squeeze-opts').hidden = true;
+  canvas.classList.add('grab');
+  squeezeTemplate(true);
+  markAll();
+  setHint('The paint is squeezed on. <b>Press above the candles and drag down</b> to pull the ruler through it.');
+  syncButtons();
+
+  new ResizeObserver(resize).observe(canvas);
+  resize();
+  if (document.fonts && document.fonts.load) {
+    Promise.all([document.fonts.load('800 40px Sniglet'), document.fonts.load('600 12px Figtree')]).then(redrawPaper, () => {});
+  }
+})();
+</script>
+</body>
+</html>
