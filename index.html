@@ -207,6 +207,25 @@ input[type="text"] {
 .btn.primary:hover:not(:disabled) { background: #ffdf55; }
 .btn:disabled { opacity: 0.45; cursor: default; }
 .divider { height: 1px; background: var(--tray-edge); margin: 0; border: 0; }
+.note { margin: 0; font-size: 13px; color: var(--ink-dim); }
+.note b { color: var(--ink); font-weight: 600; }
+.chip-wrap { display: inline-flex; }
+.chip-wrap .chip { border-style: dashed; border-right: 0; border-radius: 999px 0 0 999px; }
+.chip-x {
+  border: 1px dashed var(--tray-edge);
+  border-left: 0;
+  border-radius: 0 999px 999px 0;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0 10px 0 6px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--ink-dim);
+}
+.chip-x:hover { color: var(--ink); }
+.chip-wrap .chip[aria-pressed="true"],
+.chip-wrap .chip[aria-pressed="true"] + .chip-x { border-color: transparent; }
+.chip-wrap .chip[aria-pressed="true"] + .chip-x { background: var(--ink); color: var(--mat-deep); }
+.card.drop { outline: 3px dashed var(--accent); outline-offset: 8px; }
 .keys { margin: 0; font-size: 12px; color: var(--ink-dim); }
 .keys kbd {
   font: 600 11px var(--body);
@@ -215,7 +234,7 @@ input[type="text"] {
   border: 1px solid var(--tray-edge);
   background: rgba(255, 255, 255, 0.05);
 }
-@media (hover: none) { .keys { display: none; } }
+@media (hover: none) { .keys, .drop-tip { display: none; } }
 
 .toast {
   position: fixed;
@@ -306,6 +325,24 @@ input[type="text"] {
 
       <hr class="divider">
 
+      <section class="group">
+        <p class="label">Make your own</p>
+        <div class="row">
+          <button class="btn" id="pick-picture" type="button">Trace a picture</button>
+          <button class="btn" id="pick-template" type="button">Open template file</button>
+        </div>
+        <div class="row">
+          <button class="btn" id="save-template" type="button">Save as template</button>
+          <button class="btn" id="download-template" type="button" hidden>Download template</button>
+        </div>
+        <button class="btn" id="remove-picture" type="button" hidden>Remove picture</button>
+        <p class="note">Add a photo or drawing to paint over. <b>Save as template</b> keeps your squeezes and pulls so anyone can replay them. Download it to share.<span class="drop-tip"> You can also drop a picture or template file onto the card.</span></p>
+        <input type="file" id="file-picture" accept="image/*" hidden>
+        <input type="file" id="file-template" accept=".json,application/json" hidden>
+      </section>
+
+      <hr class="divider">
+
       <div class="row">
         <button class="btn" id="undo" type="button" disabled>Undo</button>
         <button class="btn" id="clear" type="button">Wipe paint</button>
@@ -347,6 +384,7 @@ input[type="text"] {
   }
   const toByte = (lin) => LIN2SRGB[lin <= 0 ? 0 : lin >= 1 ? LUT_N : (lin * LUT_N) | 0];
   const ksToR = (k) => 1 + k - Math.sqrt(k * k + 2 * k);
+  const round1 = (v) => Math.round(v * 10) / 10;
 
   function makePaint(id, name, hex, scatter = 1) {
     const n = parseInt(hex.slice(1), 16);
@@ -462,6 +500,7 @@ input[type="text"] {
     parked: true,
     dir: 1, lastDir: 1, active: false,
     halfLen: 0, ns: 0, travel: 0, rev: 0,
+    rec: null, // the pull being recorded for templates: { a, len, x, y, d }
     // Bead layers per sample (j * LAYERS + l, top = bn[j] - 1) and total volume bt[j].
     bv: null, bs: null, bk0: null, bk1: null, bk2: null, bn: null, bt: null, press: null,
   };
@@ -524,13 +563,10 @@ input[type="text"] {
     return out;
   }
 
-  function beginScrape(px, py, grab) {
-    snapshot();
+  // Put the ruler down with its centre at (cx, cy), ready to pull.
+  function startPull(cx, cy) {
     setAxes();
-    if (!grab) {
-      const c = rulerCentreAt(px, py);
-      ruler.cx = c.x; ruler.cy = c.y;
-    }
+    ruler.cx = cx; ruler.cy = cy;
     ruler.parked = false;
     ruler.active = true;
     ruler.dir = 0;
@@ -552,6 +588,20 @@ input[type="text"] {
     for (let j = 0; j < ns; j++) press[j] = Math.min(1.85, Math.max(0.3, 1 + 0.3 * a[j] + 0.22 * b[j] + 0.17 * c[j] + 0.09 * d[j]));
     ruler.press = press;
   }
+  function beginScrape(px, py, grab) {
+    snapshot();
+    setAxes();
+    const c = grab ? { x: ruler.cx, y: ruler.cy } : rulerCentreAt(px, py);
+    startPull(c.x, c.y);
+    ruler.rec = { a: ruler.angle, len: ruler.len, x: c.x, y: c.y, d: 0 };
+  }
+  // A hand-made pull becomes a template step: where the ruler started and how far it went.
+  function recordPull(restart) {
+    const r = ruler.rec;
+    if (!r) return;
+    if (Math.abs(r.d) >= 2) recipe.scrapes.push({ a: r.a, len: r.len, x: round1(r.x), y: round1(r.y), d: round1(r.d) });
+    ruler.rec = restart ? { a: r.a, len: r.len, x: ruler.cx, y: ruler.cy, d: 0 } : null;
+  }
 
   // Move the edge by `dn` cells along its normal.
   function advanceRuler(dn) {
@@ -562,6 +612,7 @@ input[type="text"] {
       ruler.rev += Math.abs(dn);
       if (ruler.rev < 4) return;
       dropBead();
+      recordPull(true);
       dn = s * ruler.rev;
     }
     ruler.rev = 0;
@@ -574,6 +625,7 @@ input[type="text"] {
       ruler.cx += ruler.nx * step * s;
       ruler.cy += ruler.ny * step * s;
       ruler.travel += step;
+      if (ruler.rec) ruler.rec.d += step * s;
       sweepEdge();
     }
   }
@@ -736,6 +788,7 @@ input[type="text"] {
   function endScrape() {
     if (!ruler.active) return;
     dropBead();
+    recordPull(false);
     ruler.active = false;
     // Put the ruler away so the finished picture is clear; the next press picks it up again.
     ruler.parked = false;
@@ -819,15 +872,21 @@ input[type="text"] {
 
   const LETTER_COLOURS = ['#3fb3a6', '#f07ca6', '#f3b43c', '#5b8fd6', '#a27ad6', '#f08a4b', '#64bb6a'];
 
-  function drawPaper(c, W, H) {
+  function drawPaper(c, W, H, forExport = false) {
     const s = W / GW;
     c.save();
     c.fillStyle = '#fbfbf7';
     c.fillRect(0, 0, W, H);
     c.fillStyle = c.createPattern(fibreTile(), 'repeat');
     c.fillRect(0, 0, W, H);
+    // A traced picture shows faintly, like a pencil sketch under the paint.
+    if (state.picture && !forExport) {
+      c.globalAlpha = 0.3;
+      c.drawImage(state.picture.img, 0, 0, W, H);
+      c.globalAlpha = 1;
+    }
     // Guide marks, printed in pale grey like the craft kit's card.
-    const tpl = TEMPLATES[state.template];
+    const tpl = currentTemplate();
     c.fillStyle = c.strokeStyle = '#dedcd5';
     c.lineCap = c.lineJoin = 'round';
     for (const it of tpl.items) {
@@ -1005,7 +1064,7 @@ input[type="text"] {
     if (ruler.active) {
       drawRuler(ctx, s, ruler.cx, ruler.cy, ruler.halfLen, ruler.dir || ruler.lastDir, 1, true);
     } else if (anim && anim.kind === 'scrape' && ruler.parked) {
-      drawRuler(ctx, s, ruler.cx, ruler.cy, rulerHalfLen(), 1, 0.85, false);
+      drawRuler(ctx, s, ruler.cx, ruler.cy, rulerHalfLen(), ruler.lastDir, 0.85, false);
     } else if (state.mode === 'scrape' && !anim) {
       if (hover) {
         const g = grabTest(hover.x, hover.y);
@@ -1049,8 +1108,14 @@ input[type="text"] {
       active: true, sid: ++strokeSeq, paint: paintFor(state.paint),
       hx: p.x, hy: p.y, lx: p.x, ly: p.y, holdT: performance.now(),
       first: true, moved: false, lastR: 0,
+      // Recorded as points [x, y, radius] so a template can replay the stroke.
+      rec: { c: state.paint, pts: [[p.x, p.y, 0]] }, recHold: 0,
     });
     growSqueeze(sq.holdT);
+  }
+  function recTo(x, y, r) {
+    const pts = sq.rec.pts, last = pts[pts.length - 1];
+    if (last[0] !== x || last[1] !== y) pts.push([x, y, r]);
   }
   function holdRadius(t) {
     const S0 = state.size;
@@ -1063,13 +1128,28 @@ input[type="text"] {
     if (r > sq.lastR + 0.04) {
       stampDome(sq.hx, sq.hy, r, sq.paint, sq.sid);
       sq.lastR = r;
+      if (sq.recHold < 0) {
+        // A pause mid-line: note where the blob swells.
+        recTo(sq.hx, sq.hy, state.size * 0.62);
+        sq.rec.pts.push([sq.hx, sq.hy, r]);
+        sq.recHold = sq.rec.pts.length - 1;
+      } else {
+        sq.rec.pts[sq.recHold][2] = r;
+      }
     }
   }
   function moveSqueeze(p) {
     if (!sq.moved && Math.hypot(p.x - sq.hx, p.y - sq.hy) < 2) return;
     if (Math.hypot(p.x - sq.lx, p.y - sq.ly) < 0.6) return;
     const lr = state.size * 0.62;
+    const pts = sq.rec.pts;
+    if (sq.recHold >= 0) {
+      pts.push([sq.hx, sq.hy, lr]);
+      sq.recHold = -1;
+    }
     stampSegment(sq.lx, sq.ly, lr, p.x, p.y, lr, sq.paint, sq.sid);
+    const last = pts[pts.length - 1];
+    if (Math.hypot(p.x - last[0], p.y - last[1]) >= 2) pts.push([p.x, p.y, lr]);
     sq.moved = true;
     sq.first = false;
     sq.lx = sq.hx = p.x;
@@ -1079,8 +1159,14 @@ input[type="text"] {
   }
   function endSqueeze() {
     if (!sq.active) return;
-    if (!sq.moved && sq.lastR < state.size * 0.85) stampDome(sq.hx, sq.hy, state.size * 0.85, sq.paint, sq.sid);
+    if (!sq.moved && sq.lastR < state.size * 0.85) {
+      stampDome(sq.hx, sq.hy, state.size * 0.85, sq.paint, sq.sid);
+      sq.rec.pts[0][2] = state.size * 0.85;
+    }
+    if (sq.moved) recTo(sq.lx, sq.ly, state.size * 0.62);
     sq.active = false;
+    const pts = sq.rec.pts.map((q) => [round1(q[0]), round1(q[1]), round1(q[2])]);
+    recipe.items.push(pts.length === 1 ? dot(pts[0][0], pts[0][1], pts[0][2], sq.rec.c) : line(pts, sq.rec.c));
   }
 
   // ---------------------------------------------------------------------------
@@ -1159,6 +1245,15 @@ input[type="text"] {
     },
     blank: { name: 'Blank card', msg: '', scrape: null, items: [] },
   };
+  const tplById = (id) => (Object.prototype.hasOwnProperty.call(TEMPLATES, id) ? TEMPLATES[id] : state.custom.find((t) => t.id === id) || TEMPLATES.blank);
+  const currentTemplate = () => tplById(state.template);
+
+  // Scrape steps as { a, len, x, y, d }: ruler angle and length, where its centre
+  // starts, and how far it travels along its normal (negative pulls up/left).
+  function planOf(tpl) {
+    if (!tpl || !tpl.scrape || !tpl.scrape.length) return null;
+    return tpl.scrape.map((st) => ('from' in st ? { a: 0, len: 'full', x: GW / 2, y: st.from, d: st.to - st.from } : { ...st }));
+  }
 
   // ---------------------------------------------------------------------------
   // Animations: "Squeeze it for me" pipes the template, "Scrape it for me" pulls
@@ -1193,44 +1288,42 @@ input[type="text"] {
     }
   }
   function squeezeTemplate(instant) {
-    const jobs = squeezeJobs(TEMPLATES[state.template].items);
+    const tpl = currentTemplate();
+    const jobs = squeezeJobs(tpl.items);
     if (!jobs.length) return;
+    if (!instant) snapshot();
+    recipe = { base: tpl, items: tpl.items.slice(), scrapes: [] };
     if (instant) {
       for (const j of jobs) runJob(j, 1);
       parkRuler();
       kick();
       return;
     }
-    snapshot();
     anim = { kind: 'squeeze', jobs, idx: 0, t0: performance.now() };
     syncButtons();
     kick();
   }
   function scrapePlan() {
-    const tpl = TEMPLATES[state.template];
-    if (tpl.scrape) return tpl.scrape;
+    const plan = planOf(currentTemplate());
+    if (plan) return plan;
     const top = topOfPaint();
-    return [{ from: Math.max(4, (top < 0 ? 40 : top) - 12), to: GH + 60 }];
+    const y = Math.max(4, (top < 0 ? 40 : top) - 12);
+    return [{ a: 0, len: 'full', x: GW / 2, y, d: GH + 60 - y }];
   }
   function startStage() {
     const st = anim.stages[anim.si];
-    if (anim.si === 0) beginScrape(GW / 2, st.from, false);
-    else {
-      // Later pulls carry on from the same press; only the ruler is lifted.
-      ruler.cx = GW / 2; ruler.cy = st.from;
-      ruler.parked = false; ruler.active = true; ruler.dir = 0; ruler.rev = 0;
-    }
-    anim.pos = st.from;
-    anim.from = st.from;
-    anim.to = st.to;
-    anim.dur = 500 + Math.abs(st.to - st.from) * 3.4;
+    setAngle(st.a);
+    setLen(st.len);
+    startPull(st.x, st.y);
+    anim.pos = 0;
+    anim.to = st.d;
+    anim.dur = 500 + Math.abs(st.d) * 3.4;
     anim.t0 = performance.now();
   }
   function autoScrape() {
     if (busy()) return;
-    setAngle(0);
-    setLen('full');
     setMode('scrape');
+    snapshot();
     anim = { kind: 'scrape', stages: scrapePlan(), si: 0, pause: 0 };
     startStage();
     syncButtons();
@@ -1252,7 +1345,8 @@ input[type="text"] {
       anim = null;
       parkRuler();
       const st = scrapePlan()[0];
-      setHint(`Paint's on. Now <b>pull the ruler ${st.to < st.from ? 'up' : 'down'}</b> through it, or tap <b>Scrape it for me</b>.`);
+      const way = st.a === 0 ? (st.d < 0 ? ' up' : ' down') : '';
+      setHint(`Paint's on. Now <b>pull the ruler${way}</b> through it, or tap <b>Scrape it for me</b>.`);
       syncButtons();
     } else {
       if (anim.pause) {
@@ -1263,25 +1357,29 @@ input[type="text"] {
       }
       const f = Math.min(1, (now - anim.t0) / anim.dur);
       const e = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
-      const pos = anim.from + (anim.to - anim.from) * e;
+      const pos = anim.to * e;
       advanceRuler(pos - anim.pos);
       anim.pos = pos;
       if (f < 1) return;
       dropBead();
       if (++anim.si < anim.stages.length) {
         // Lift: the bead stays behind as a ridge, then the ruler goes down again.
+        const next = anim.stages[anim.si];
         ruler.active = false;
+        setAngle(next.a);
+        setLen(next.len);
+        ruler.cx = next.x; ruler.cy = next.y;
         ruler.parked = true;
-        ruler.cx = GW / 2; ruler.cy = anim.stages[anim.si].from;
+        ruler.lastDir = next.d < 0 ? -1 : 1;
         anim.pause = now + 380;
         return;
       }
+      const many = anim.stages.length > 1;
       anim = null;
       ruler.active = true;
       endScrape();
-      const many = TEMPLATES[state.template].scrape && TEMPLATES[state.template].scrape.length > 1;
       setHint(many
-        ? 'Ta-da. The ruler stopped between tiers to keep the edges crisp. Your turn: <b>Wipe paint</b> and squeeze your own.'
+        ? 'Ta-da. The ruler stopped between layers to keep the edges crisp. Your turn: <b>Wipe paint</b> and squeeze your own.'
         : 'Ta-da. Your turn: <b>Wipe paint</b>, squeeze new blobs, and pull the ruler any way you like.');
       syncButtons();
     }
@@ -1292,9 +1390,9 @@ input[type="text"] {
   // ---------------------------------------------------------------------------
   const undoStack = [];
   function snapshot() {
-    const snap = new Float32Array(N * 5);
-    snap.set(V, 0); snap.set(K0, N); snap.set(K1, 2 * N); snap.set(K2, 3 * N); snap.set(S, 4 * N);
-    undoStack.push(snap);
+    const buf = new Float32Array(N * 5);
+    buf.set(V, 0); buf.set(K0, N); buf.set(K1, 2 * N); buf.set(K2, 3 * N); buf.set(S, 4 * N);
+    undoStack.push({ buf, recipe: { base: recipe.base, items: recipe.items.slice(), scrapes: recipe.scrapes.slice() } });
     if (undoStack.length > 8) undoStack.shift();
     syncButtons();
   }
@@ -1302,8 +1400,10 @@ input[type="text"] {
     if (busy() || sq.active || ruler.active) return;
     const snap = undoStack.pop();
     if (!snap) return;
-    V.set(snap.subarray(0, N)); K0.set(snap.subarray(N, 2 * N)); K1.set(snap.subarray(2 * N, 3 * N));
-    K2.set(snap.subarray(3 * N, 4 * N)); S.set(snap.subarray(4 * N));
+    const b = snap.buf;
+    V.set(b.subarray(0, N)); K0.set(b.subarray(N, 2 * N)); K1.set(b.subarray(2 * N, 3 * N));
+    K2.set(b.subarray(3 * N, 4 * N)); S.set(b.subarray(4 * N));
+    recipe = snap.recipe;
     markAll();
     if (!ruler.active) parkRuler();
     syncButtons();
@@ -1312,6 +1412,7 @@ input[type="text"] {
   function wipe(withSnapshot = true) {
     if (withSnapshot) snapshot();
     V.fill(0);
+    recipe = { base: currentTemplate(), items: [], scrapes: [] };
     markAll();
     parkRuler();
     kick();
@@ -1320,7 +1421,14 @@ input[type="text"] {
   // ---------------------------------------------------------------------------
   // UI state and wiring
   // ---------------------------------------------------------------------------
-  const state = { mode: 'scrape', paint: 'red', size: 10, template: 'cake', msg: TEMPLATES.cake.msg, msgEdited: false };
+  const state = {
+    mode: 'scrape', paint: 'red', size: 10, template: 'cake', msg: TEMPLATES.cake.msg, msgEdited: false,
+    custom: [],     // the viewer's own templates
+    picture: null,  // { url, img } traced under the paint
+  };
+  // What has been done on this card since it was last wiped: the template it
+  // started from, every squeeze stroke, and every hand-made pull.
+  let recipe = { base: null, items: [], scrapes: [] };
   const $ = (id) => document.getElementById(id);
   const hintEl = $('hint');
   function setHint(html) { hintEl.innerHTML = html; }
@@ -1368,18 +1476,30 @@ input[type="text"] {
     state.paint = id;
     for (const b of $('swatches').children) b.setAttribute('aria-pressed', String(b.dataset.paint === id));
   }
+  function markTemplateChips() {
+    for (const b of $('templates').querySelectorAll('[data-tpl]')) b.setAttribute('aria-pressed', String(b.dataset.tpl === state.template));
+  }
   function setTemplate(id, { squeeze = false } = {}) {
+    const t = tplById(id);
     state.template = id;
-    for (const b of $('templates').children) b.setAttribute('aria-pressed', String(b.dataset.tpl === id));
-    if (!state.msgEdited) {
-      state.msg = TEMPLATES[id].msg;
+    markTemplateChips();
+    if (t.custom) {
+      // A shared template brings its own message and picture.
+      if (t.msg || !state.msgEdited) {
+        state.msg = t.msg;
+        state.msgEdited = false;
+        $('msg').value = state.msg;
+      }
+      setPicture(t.picture || null);
+    } else if (!state.msgEdited) {
+      state.msg = t.msg;
       $('msg').value = state.msg;
     }
     redrawPaper();
     syncButtons();
     if (squeeze) {
       wipe(true);
-      if (TEMPLATES[id].items.length) {
+      if (t.items.length) {
         squeezeTemplate(false);
         setHint('Squeezing the paint onto the guide marks…');
       } else {
@@ -1392,9 +1512,10 @@ input[type="text"] {
     const b = busy();
     $('undo').disabled = b || undoStack.length === 0;
     $('clear').disabled = b;
-    $('auto-squeeze').disabled = b || TEMPLATES[state.template].items.length === 0;
+    $('auto-squeeze').disabled = b || currentTemplate().items.length === 0;
     $('auto-scrape').disabled = b;
     $('save').disabled = b;
+    for (const id of ['pick-picture', 'pick-template', 'save-template', 'download-template', 'remove-picture']) $(id).disabled = b;
   }
 
   // Swatches and templates
@@ -1409,14 +1530,32 @@ input[type="text"] {
     b.addEventListener('click', () => { setPaint(p.id); setMode('squeeze'); });
     $('swatches').appendChild(b);
   }
-  for (const [id, t] of Object.entries(TEMPLATES)) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'chip';
-    b.dataset.tpl = id;
-    b.textContent = t.name;
-    b.addEventListener('click', () => { if (!busy()) setTemplate(id, { squeeze: true }); });
-    $('templates').appendChild(b);
+  function renderTemplateChips() {
+    const box = $('templates');
+    box.textContent = '';
+    const add = (id, name, custom) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip';
+      b.dataset.tpl = id;
+      b.textContent = name;
+      b.addEventListener('click', () => { if (!busy()) setTemplate(id, { squeeze: true }); });
+      if (!custom) { box.appendChild(b); return; }
+      const wrap = document.createElement('span');
+      wrap.className = 'chip-wrap';
+      const x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'chip-x';
+      x.textContent = '×';
+      x.title = 'Remove template';
+      x.setAttribute('aria-label', `Remove template ${name}`);
+      x.addEventListener('click', () => removeCustom(id));
+      wrap.append(b, x);
+      box.appendChild(wrap);
+    };
+    for (const [id, t] of Object.entries(TEMPLATES)) add(id, t.name, false);
+    for (const t of state.custom) add(t.id, t.name, true);
+    markTemplateChips();
   }
 
   $('mode-squeeze').addEventListener('click', () => setMode('squeeze'));
@@ -1534,31 +1673,19 @@ input[type="text"] {
   const hosted = !!(window.claude && typeof window.claude.use === 'function');
   let downloads = null;
   if (hosted) {
-    window.claude.use('downloads').then((d) => { downloads = d; $('save').hidden = !d; }, () => {});
+    window.claude.use('downloads').then((d) => {
+      downloads = d;
+      $('save').hidden = $('download-template').hidden = !d;
+    }, () => {});
   } else {
-    $('save').hidden = false;
+    $('save').hidden = $('download-template').hidden = false;
   }
-  function exportBlob() {
-    const W = 1200, H = 1800;
-    const c = document.createElement('canvas');
-    c.width = W; c.height = H;
-    const x = c.getContext('2d');
-    drawPaper(x, W, H);
-    markAll();
-    renderPaint();
-    x.imageSmoothingEnabled = true;
-    x.imageSmoothingQuality = 'high';
-    x.drawImage(paintCanvas, 0, 0, W, H);
-    return new Promise((res) => c.toBlob(res, 'image/png'));
-  }
-  $('save').addEventListener('click', async () => {
-    const blob = await exportBlob();
-    if (!blob) { toast('Could not make the picture'); return; }
-    const filename = `${(state.msg.trim() || 'squeeze-and-scrape').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'card'}.png`;
+  const slug = (str, fallback) => str.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || fallback;
+  async function saveFile(filename, blob, done) {
     if (downloads) {
       try {
         await downloads.save({ filename, data: blob });
-        toast('Saved');
+        toast(done);
       } catch (err) {
         toast(err && err.code === 'declined' ? 'Save cancelled' : 'Saving is not available here');
       }
@@ -1571,7 +1698,279 @@ input[type="text"] {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    toast('Saved');
+    toast(done);
+  }
+  function exportBlob() {
+    const W = 1200, H = 1800;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    drawPaper(x, W, H, true);
+    markAll();
+    renderPaint();
+    x.imageSmoothingEnabled = true;
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(paintCanvas, 0, 0, W, H);
+    return new Promise((res) => c.toBlob(res, 'image/png'));
+  }
+  $('save').addEventListener('click', async () => {
+    const blob = await exportBlob();
+    if (!blob) { toast('Could not make the picture'); return; }
+    saveFile(`${slug(state.msg, 'squeeze-and-scrape')}.png`, blob, 'Saved');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Your own templates. A template file is JSON:
+  //   { kind, version, name, message, items: [dot | line], scrape: [step], picture }
+  // Files come from anyone, so every field is checked and clamped before use.
+  // Saved templates are kept in this browser; download one to share it.
+  // ---------------------------------------------------------------------------
+  const TEMPLATE_KIND = 'squeeze-and-scrape-template';
+  const STORE_KEY = 'squeeze-and-scrape/templates/v1';
+  const newId = () => 'u-' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36);
+  const cleanText = (v, max) => (typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, max) : '');
+  function badFile(msg) { return Object.assign(new Error(msg), { userMessage: msg }); }
+
+  function sanitizeTemplate(o) {
+    if (!o || typeof o !== 'object' || o.kind !== TEMPLATE_KIND) throw badFile("That file isn't a Squeeze & Scrape template.");
+    const num = (v, lo, hi) => {
+      const n = Number(v);
+      if (!Number.isFinite(n)) throw badFile('That template file is damaged.');
+      return round1(Math.min(hi, Math.max(lo, n)));
+    };
+    const items = [];
+    let budget = 20000; // total points, so a huge file cannot stall playback
+    for (const it of Array.isArray(o.items) ? o.items.slice(0, 800) : []) {
+      if (!it || typeof it !== 'object' || !Object.prototype.hasOwnProperty.call(PAINT, it.c)) continue;
+      if (it.t === 'dot') {
+        items.push(dot(num(it.x, -40, GW + 40), num(it.y, -40, GH + 40), num(it.r, 1, 40), it.c));
+        budget--;
+      } else if (it.t === 'line' && Array.isArray(it.pts)) {
+        const pts = it.pts.filter(Array.isArray).slice(0, Math.max(0, budget)).map((q) => [num(q[0], -40, GW + 40), num(q[1], -40, GH + 40), num(q[2], 1, 40)]);
+        budget -= pts.length;
+        if (pts.length) items.push(line(pts, it.c));
+      }
+      if (budget <= 0) break;
+    }
+    const scrape = (Array.isArray(o.scrape) ? o.scrape.slice(0, 40) : []).filter((st) => st && typeof st === 'object').map((st) => ({
+      a: Math.round(num(st.a, -90, 90) / 5) * 5,
+      len: ['full', 'half', 'short'].includes(st.len) ? st.len : 'full',
+      x: num(st.x, -300, GW + 300),
+      y: num(st.y, -300, GH + 300),
+      d: num(st.d, -1500, 1500),
+    }));
+    const picture = typeof o.picture === 'string' && o.picture.length < 4e6 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(o.picture) ? o.picture : null;
+    if (!items.length && !picture) throw badFile('That template has no paint or picture in it.');
+    return {
+      custom: true,
+      name: cleanText(o.name, 24).trim() || 'My card',
+      msg: cleanText(o.message, 30),
+      items,
+      scrape: scrape.length ? scrape : null,
+      picture,
+    };
+  }
+  function templateToJSON(t) {
+    return {
+      kind: TEMPLATE_KIND,
+      version: 1,
+      name: t.name,
+      message: t.msg || '',
+      items: t.items.map((it) => (it.t === 'dot'
+        ? { t: 'dot', c: it.c, x: round1(it.x), y: round1(it.y), r: round1(it.r) }
+        : { t: 'line', c: it.c, pts: it.pts.map((q) => [round1(q[0]), round1(q[1]), round1(q[2])]) })),
+      scrape: planOf(t),
+      picture: t.picture || null,
+    };
+  }
+  function loadCustom() {
+    try {
+      const arr = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+      if (!Array.isArray(arr)) return [];
+      const out = [];
+      for (const o of arr.slice(0, 60)) {
+        try {
+          const t = sanitizeTemplate(o);
+          t.id = typeof o.id === 'string' && /^u-[a-z0-9]{1,16}$/.test(o.id) && !out.some((u) => u.id === o.id) ? o.id : newId();
+          out.push(t);
+        } catch (_) { /* skip a damaged entry */ }
+      }
+      return out;
+    } catch (_) {
+      return [];
+    }
+  }
+  function storeCustom() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(state.custom.map((t) => ({ id: t.id, ...templateToJSON(t) }))));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+  function uniqueName(name) {
+    if (!state.custom.some((t) => t.name === name)) return name;
+    for (let n = 2; ; n++) {
+      const cand = `${name.slice(0, 21)} ${n}`;
+      if (!state.custom.some((t) => t.name === cand)) return cand;
+    }
+  }
+  // The card as it stands: everything squeezed since the last wipe, and the
+  // pulls made by hand (or the starting template's pulls if there were none).
+  function recipeTemplate() {
+    if (!recipe.items.length) return null;
+    const msg = state.msg.trim().slice(0, 30);
+    return {
+      custom: true,
+      name: msg ? msg.slice(0, 24) : 'My card',
+      msg,
+      items: recipe.items.slice(),
+      scrape: recipe.scrapes.length ? recipe.scrapes.slice() : planOf(recipe.base),
+      picture: state.picture ? state.picture.url : null,
+    };
+  }
+  function addCustom(t) {
+    t.id = newId();
+    t.name = uniqueName(t.name);
+    state.custom.push(t);
+    const kept = storeCustom();
+    renderTemplateChips();
+    return kept;
+  }
+  function removeCustom(id) {
+    if (busy()) return;
+    const t = state.custom.find((u) => u.id === id);
+    if (!t) return;
+    state.custom = state.custom.filter((u) => u !== t);
+    storeCustom();
+    if (state.template === id) {
+      state.template = 'blank';
+      redrawPaper();
+    }
+    renderTemplateChips();
+    syncButtons();
+    toast(`Removed “${t.name}”`);
+  }
+
+  // Pictures are cropped to the card's 2:3 shape and stored as a small JPEG,
+  // so they fit inside a template file.
+  function pictureToDataURL(file) {
+    return new Promise((resolve, reject) => {
+      const src = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const W = 600, H = 900;
+        const c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        const x = c.getContext('2d');
+        x.fillStyle = '#ffffff';
+        x.fillRect(0, 0, W, H);
+        const sc = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+        const dw = img.naturalWidth * sc, dh = img.naturalHeight * sc;
+        x.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+        URL.revokeObjectURL(src);
+        resolve(c.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = () => { URL.revokeObjectURL(src); reject(new Error('decode')); };
+      img.src = src;
+    });
+  }
+  function setPicture(url) {
+    if (!url) {
+      state.picture = null;
+      $('remove-picture').hidden = true;
+      redrawPaper();
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      state.picture = { url, img };
+      $('remove-picture').hidden = false;
+      redrawPaper();
+    };
+    img.onerror = () => toast("Couldn't show that picture");
+    img.src = url;
+  }
+  async function loadPicture(file) {
+    if (busy()) return;
+    if (file.size > 40e6) { toast('That picture is too big. Try one under 40 MB.'); return; }
+    let url;
+    try {
+      url = await pictureToDataURL(file);
+    } catch (_) {
+      toast("Couldn't read that picture. Try a JPG or PNG.");
+      return;
+    }
+    setPicture(url);
+    setMode('squeeze');
+    setHint('Your picture is on the card. <b>Squeeze paint</b> over it, then pull the ruler. <b>Save as template</b> to share it.');
+  }
+  async function openTemplateFile(file) {
+    if (busy()) return;
+    if (file.size > 6e6) { toast('That file is too big to be a template'); return; }
+    let t;
+    try {
+      t = sanitizeTemplate(JSON.parse(await file.text()));
+    } catch (err) {
+      toast(err && err.userMessage ? err.userMessage : "That file isn't a Squeeze & Scrape template.");
+      return;
+    }
+    addCustom(t);
+    setTemplate(t.id, { squeeze: true });
+    if (!t.items.length) setHint(`Opened “${t.name}”. Squeeze paint over the picture, then pull the ruler.`);
+    toast(`Opened “${t.name}”`);
+  }
+  function handleFile(f) {
+    if (/^image\//.test(f.type)) loadPicture(f);
+    else if (/json/.test(f.type) || /\.json$/i.test(f.name)) openTemplateFile(f);
+    else toast('Drop a picture or a template file');
+  }
+
+  $('pick-picture').addEventListener('click', () => $('file-picture').click());
+  $('pick-template').addEventListener('click', () => $('file-template').click());
+  for (const id of ['file-picture', 'file-template']) {
+    $(id).addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (f) (id === 'file-picture' ? loadPicture : openTemplateFile)(f);
+    });
+  }
+  $('remove-picture').addEventListener('click', () => setPicture(null));
+  $('save-template').addEventListener('click', () => {
+    if (busy()) return;
+    const t = recipeTemplate();
+    if (!t) { toast('Squeeze some paint first'); return; }
+    const kept = addCustom(t);
+    state.template = t.id; // its guide marks now match what is on the card
+    recipe.base = t;
+    markTemplateChips();
+    redrawPaper();
+    syncButtons();
+    toast(kept ? `Saved “${t.name}” to your templates` : `Saved “${t.name}” for this visit only`);
+  });
+  $('download-template').addEventListener('click', () => {
+    if (busy()) return;
+    const t = recipeTemplate() || (currentTemplate().custom ? currentTemplate() : null);
+    if (!t) { toast('Squeeze some paint first'); return; }
+    const blob = new Blob([JSON.stringify(templateToJSON(t))], { type: 'application/json' });
+    saveFile(`${slug(t.name, 'my-card')}-template.json`, blob, 'Template downloaded');
+  });
+
+  // Drop a picture or template file anywhere on the page.
+  const cardEl = $('card');
+  const hasFiles = (e) => !!e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+  window.addEventListener('dragover', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    cardEl.classList.add('drop');
+  });
+  window.addEventListener('dragleave', (e) => { if (!e.relatedTarget) cardEl.classList.remove('drop'); });
+  window.addEventListener('drop', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    cardEl.classList.remove('drop');
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
   });
 
   // ---------------------------------------------------------------------------
@@ -1583,7 +1982,8 @@ input[type="text"] {
   setLen('full');
   setAngle(0);
   $('msg').value = state.msg;
-  for (const b of $('templates').children) b.setAttribute('aria-pressed', String(b.dataset.tpl === state.template));
+  state.custom = loadCustom();
+  renderTemplateChips();
   $('squeeze-opts').hidden = true;
   canvas.classList.add('grab');
   squeezeTemplate(true);
