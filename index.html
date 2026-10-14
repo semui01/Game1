@@ -136,20 +136,21 @@ h1 .amp { color: var(--accent); }
 }
 .label output { letter-spacing: 0.04em; color: var(--ink); font-variant-numeric: tabular-nums; }
 
-.modes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .mode {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  column-gap: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
   text-align: left;
-  padding: 10px 12px;
+  padding: 10px;
   border-radius: 12px;
   border: 1px solid var(--tray-edge);
   background: rgba(255, 255, 255, 0.03);
 }
-.mode svg { grid-row: span 2; width: 28px; height: 28px; }
-.mode strong { font-weight: 700; font-size: 16px; line-height: 1.1; }
+.mode svg { width: 24px; height: 24px; margin-bottom: 4px; }
+.mode strong { font-weight: 700; font-size: 15px; line-height: 1.1; }
 .mode small { font-size: 12px; color: var(--ink-dim); line-height: 1.2; }
 .mode[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .mode[aria-pressed="true"] small { color: var(--accent-ink); opacity: 0.75; }
@@ -172,6 +173,41 @@ h1 .amp { color: var(--accent); }
 .swatch[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pens { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.pen {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--tray-edge);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+.pen i {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 7px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2);
+  transform: rotate(-14deg);
+}
+.pen[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.steps .btn { padding-inline: 8px; }
+.steps .n {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 11px;
+  font-weight: 700;
+}
+.steps .btn.primary .n { background: rgba(0, 0, 0, 0.14); }
 .chip {
   padding: 6px 11px;
   border-radius: 999px;
@@ -328,6 +364,11 @@ input[type="text"] {
           <strong>Scrape</strong>
           <small>drag the ruler</small>
         </button>
+        <button class="mode" id="mode-draw" type="button" aria-pressed="false">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M22 4l6 6L12 26l-8 2 2-8z" fill="currentColor" opacity=".18"/><path d="M22 4l6 6L12 26l-8 2 2-8zM18.5 7.5l6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          <strong>Draw</strong>
+          <small>pen on top</small>
+        </button>
       </div>
 
       <section class="group" id="squeeze-opts" hidden>
@@ -335,6 +376,17 @@ input[type="text"] {
         <div class="swatches" id="swatches" role="group" aria-label="Paint colour"></div>
         <label class="label" for="size">Nozzle size <output id="size-out" for="size">10</output></label>
         <input type="range" id="size" min="4" max="22" step="1" value="10">
+      </section>
+
+      <section class="group" id="draw-opts" hidden>
+        <p class="label">Paint pen</p>
+        <div class="pens" id="pens" role="group" aria-label="Pen colour"></div>
+        <div class="chips" id="pen-sizes" role="group" aria-label="Pen size">
+          <button class="chip" type="button" data-w="1.5">Fine</button>
+          <button class="chip" type="button" data-w="2.4">Medium</button>
+          <button class="chip" type="button" data-w="3.6">Bold</button>
+        </div>
+        <button class="btn" id="clear-lines" type="button">Clear pen lines</button>
       </section>
 
       <section class="group" id="scrape-opts">
@@ -359,9 +411,11 @@ input[type="text"] {
       <section class="group">
         <p class="label">Card</p>
         <div class="chips" id="templates" role="group" aria-label="Card template"></div>
-        <div class="row">
-          <button class="btn" id="auto-squeeze" type="button">Squeeze it for me</button>
-          <button class="btn primary" id="auto-scrape" type="button">Scrape it for me</button>
+        <p class="label">Do it for me</p>
+        <div class="steps" role="group" aria-label="Do it for me">
+          <button class="btn" id="auto-squeeze" type="button"><span class="n">1</span>Squeeze</button>
+          <button class="btn primary" id="auto-scrape" type="button"><span class="n">2</span>Scrape</button>
+          <button class="btn" id="auto-draw" type="button"><span class="n">3</span>Draw</button>
         </div>
         <label class="label" for="msg">Message</label>
         <input type="text" id="msg" maxlength="30" autocomplete="off" spellcheck="false">
@@ -381,7 +435,7 @@ input[type="text"] {
         </div>
         <button class="btn" id="post-gallery" type="button" hidden>Post to gallery</button>
         <button class="btn" id="remove-picture" type="button" hidden>Remove picture</button>
-        <p class="note">Add a photo or drawing to paint over. <b>Save as template</b> keeps your squeezes and pulls so anyone can replay them.<span id="gallery-tip" hidden> <b>Post to gallery</b> shares it with everyone who opens this page.</span> Download it to share as a file.<span class="drop-tip"> You can also drop a picture or template file onto the card.</span></p>
+        <p class="note">Add a photo or drawing to paint over. <b>Save as template</b> keeps your squeezes, pulls and pen lines so anyone can replay them.<span id="gallery-tip" hidden> <b>Post to gallery</b> shares it with everyone who opens this page.</span> Download it to share as a file.<span class="drop-tip"> You can also drop a picture or template file onto the card.</span></p>
         <input type="file" id="file-picture" accept="image/*" hidden>
         <input type="file" id="file-template" accept=".json,application/json" hidden>
       </section>
@@ -393,7 +447,7 @@ input[type="text"] {
         <button class="btn" id="clear" type="button">Wipe paint</button>
         <button class="btn" id="save" type="button" hidden>Save picture</button>
       </div>
-      <p class="keys"><kbd>S</kbd> squeeze · <kbd>R</kbd> ruler · <kbd>Q</kbd>/<kbd>E</kbd> turn ruler · <kbd>[</kbd>/<kbd>]</kbd> size · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</p>
+      <p class="keys"><kbd>S</kbd> squeeze · <kbd>R</kbd> ruler · <kbd>D</kbd> pen · <kbd>Q</kbd>/<kbd>E</kbd> turn ruler · <kbd>[</kbd>/<kbd>]</kbd> size · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</p>
     </aside>
   </main>
 
@@ -844,6 +898,7 @@ input[type="text"] {
     dropBead();
     recordPull(false);
     ruler.active = false;
+    markNextStep(linesOf(currentTemplate()).length ? 3 : 0);
     // Put the ruler away so the finished picture is clear; the next press picks it up again.
     ruler.parked = false;
   }
@@ -1041,8 +1096,10 @@ input[type="text"] {
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w; canvas.height = h;
       paperCanvas.width = w; paperCanvas.height = h;
+      lineCanvas.width = w; lineCanvas.height = h;
     }
     redrawPaper();
+    redrawLines();
   }
   function redrawPaper() {
     if (!paperCanvas.width) return;
@@ -1115,6 +1172,10 @@ input[type="text"] {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(paintCanvas, 0, 0, W, H);
+    if (state.mode === 'draw' && !anim) drawLineGuides(ctx, s);
+    ctx.drawImage(lineCanvas, 0, 0);
+    if (pen.active) drawStroke(ctx, s, pen.stroke);
+    if (anim && anim.kind === 'draw' && anim.partial) drawStroke(ctx, s, anim.partial);
     if (ruler.active) {
       drawRuler(ctx, s, ruler.cx, ruler.cy, ruler.halfLen, ruler.dir || ruler.lastDir, 1, true);
     } else if (anim && anim.kind === 'scrape' && ruler.parked) {
@@ -1135,6 +1196,8 @@ input[type="text"] {
       ctx.arc(hover.x * s, hover.y * s, state.size * s, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
+    } else if (state.mode === 'draw' && hover && !pen.active && !anim) {
+      drawStroke(ctx, s, { c: state.pen, pts: [[hover.x, hover.y, state.penW]] });
     }
   }
 
@@ -1221,6 +1284,114 @@ input[type="text"] {
     sq.active = false;
     const pts = sq.rec.pts.map((q) => [round1(q[0]), round1(q[1]), round1(q[2])]);
     recipe.items.push(pts.length === 1 ? dot(pts[0][0], pts[0][1], pts[0][2], sq.rec.c) : line(pts, sq.rec.c));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pen: line work drawn on top once the paint is down, like a paint pen or a
+  // fine liner on the real card. A stroke is { c: pen id, pts: [[x, y, width]] }
+  // in cells. Pen lines sit above the paint and are not moved by the ruler.
+  // ---------------------------------------------------------------------------
+  const PENS = {
+    ink: { name: 'Ink', base: 'rgba(28, 24, 26, 0.92)', swatch: '#1c181a' },
+    white: { name: 'White gel', base: 'rgba(255, 255, 255, 0.96)', shadow: true, swatch: '#ffffff' },
+    gold: { name: 'Gold', base: '#bf8f22', hi: '#f7dd8b', shadow: true, swatch: 'linear-gradient(90deg, #a87a17, #f7dd8b 55%, #c4952a)' },
+    cherry: { name: 'Cherry', base: '#d8304a', swatch: '#d8304a' },
+  };
+  const lineCanvas = document.createElement('canvas');
+  const pen = { active: false, stroke: null, lastT: 0 };
+  const linesOf = (tpl) => (tpl && Array.isArray(tpl.lines) ? tpl.lines : []);
+
+  // Smooth through the points with midpoint curves, each piece at its own width.
+  function drawStroke(c, s, st) {
+    const look = PENS[st.c] || PENS.ink;
+    const pts = st.pts;
+    if (!pts.length) return;
+    const pass = (colour, mul, dx, dy) => {
+      c.strokeStyle = c.fillStyle = colour;
+      if (pts.length === 1) {
+        const [x, y, w] = pts[0];
+        c.beginPath();
+        c.arc((x + dx) * s, (y + dy) * s, Math.max(0.5, (w * mul * s) / 2), 0, Math.PI * 2);
+        c.fill();
+        return;
+      }
+      c.lineCap = c.lineJoin = 'round';
+      let px = pts[0][0], py = pts[0][1];
+      for (let i = 1; i < pts.length; i++) {
+        const [x, y, w] = pts[i];
+        const last = i === pts.length - 1;
+        const nx = last ? x : (x + pts[i + 1][0]) / 2, ny = last ? y : (y + pts[i + 1][1]) / 2;
+        c.lineWidth = Math.max(0.6, w * mul * s);
+        c.beginPath();
+        c.moveTo((px + dx) * s, (py + dy) * s);
+        c.quadraticCurveTo((x + dx) * s, (y + dy) * s, (nx + dx) * s, (ny + dy) * s);
+        c.stroke();
+        px = nx; py = ny;
+      }
+    };
+    c.save();
+    if (look.shadow) {
+      c.shadowColor = 'rgba(0, 0, 0, 0.3)';
+      c.shadowBlur = 1.4 * s;
+      c.shadowOffsetY = 0.45 * s;
+    }
+    pass(look.base, 1, 0, 0);
+    c.shadowColor = 'transparent';
+    if (look.hi) pass(look.hi, 0.42, -0.22, -0.3);
+    c.restore();
+  }
+  const drawStrokes = (c, s, list) => { for (const st of list) drawStroke(c, s, st); };
+  function redrawLines() {
+    if (!lineCanvas.width) return;
+    const c = lineCanvas.getContext('2d');
+    c.clearRect(0, 0, lineCanvas.width, lineCanvas.height);
+    drawStrokes(c, lineCanvas.width / GW, state.lines);
+    kick();
+  }
+  // The card's own line work, as faint dashes to trace in Draw mode.
+  function drawLineGuides(c, s) {
+    const list = linesOf(currentTemplate());
+    if (!list.length) return;
+    c.save();
+    c.lineCap = c.lineJoin = 'round';
+    c.setLineDash([3.5 * dpr, 3.5 * dpr]);
+    for (const [colour, width] of [['rgba(20, 20, 20, 0.22)', 2.6], ['rgba(255, 255, 255, 0.85)', 1.1]]) {
+      c.strokeStyle = colour;
+      c.lineWidth = width * dpr;
+      for (const st of list) {
+        c.beginPath();
+        if (st.pts.length === 1) c.arc(st.pts[0][0] * s, st.pts[0][1] * s, Math.max(2 * dpr, st.pts[0][2] * s * 0.6), 0, Math.PI * 2);
+        else st.pts.forEach(([x, y], i) => (i ? c.lineTo(x * s, y * s) : c.moveTo(x * s, y * s)));
+        c.stroke();
+      }
+    }
+    c.restore();
+  }
+  function beginPen(p) {
+    snapshot('lines');
+    pen.active = true;
+    pen.lastT = performance.now();
+    pen.stroke = { c: state.pen, pts: [[p.x, p.y, state.penW]] };
+  }
+  function movePen(p) {
+    const pts = pen.stroke.pts, last = pts[pts.length - 1];
+    const d = Math.hypot(p.x - last[0], p.y - last[1]);
+    if (d < 0.8) return;
+    const now = performance.now();
+    const speed = d / Math.max(4, now - pen.lastT); // cells per millisecond
+    pen.lastT = now;
+    // A quick flick comes out thinner, like a real pen.
+    const target = state.penW * Math.min(1.15, Math.max(0.55, 1.2 - speed * 0.9));
+    pts.push([p.x, p.y, last[2] * 0.6 + target * 0.4]);
+  }
+  function endPen() {
+    if (!pen.active) return;
+    pen.active = false;
+    const st = { c: pen.stroke.c, pts: pen.stroke.pts.map((q) => [round1(q[0]), round1(q[1]), round1(q[2])]) };
+    pen.stroke = null;
+    state.lines.push(st);
+    recipe.lines.push(st);
+    redrawLines();
   }
 
   // ---------------------------------------------------------------------------
@@ -1311,6 +1482,138 @@ input[type="text"] {
     return tpl.scrape.map((st) => ('from' in st ? { a: 0, len: 'full', x: GW / 2, y: st.from, d: st.to - st.from } : { ...st }));
   }
 
+  // Line art for the built-in cards. Every scrape comes out a little
+  // different, so this is loose doodled decoration rather than tight outlines.
+  function handDrawn(pts, w, seed, wobble) {
+    const rnd = seeded(seed), n = pts.length;
+    const off = valueNoise(n + 2, 9, rnd), wid = valueNoise(n + 2, 14, rnd);
+    return pts.map((q, i) => {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+      const tx = b[0] - a[0], ty = b[1] - a[1], l = Math.hypot(tx, ty) || 1;
+      const taper = n > 3 ? Math.min(1, 0.55 + Math.min(i, n - 1 - i) * 0.15) : 1;
+      return [round1(q[0] - (ty / l) * off[i] * wobble), round1(q[1] + (tx / l) * off[i] * wobble), round1(w * taper * (1 + 0.18 * wid[i]))];
+    });
+  }
+  function ellipseArc(cx, cy, rx, ry, a0, a1) {
+    const n = Math.max(6, Math.ceil((Math.abs(a1 - a0) / 360) * Math.PI * 2 * Math.max(rx, ry) / 2.5));
+    const pts = [];
+    for (let k = 0; k <= n; k++) {
+      const a = ((a0 + ((a1 - a0) * k) / n) * Math.PI) / 180;
+      pts.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]);
+    }
+    return pts;
+  }
+  // A garland of little downward loops along y = yAt(x), like piped frosting.
+  function scallops(x0, x1, yAt, r) {
+    const n = Math.max(1, Math.round((x1 - x0) / (2 * r))), step = (x1 - x0) / n, pts = [];
+    for (let k = 0; k < n; k++) {
+      const cx = x0 + step * (k + 0.5);
+      for (let j = 0; j <= 10; j++) {
+        const a = Math.PI * (1 - j / 10), x = cx + (Math.cos(a) * step) / 2;
+        pts.push([x, yAt(x) + Math.sin(a) * r]);
+      }
+    }
+    return pts;
+  }
+  function teardrop(cx, by, h, w) {
+    const pts = [];
+    for (let j = 0; j <= 28; j++) {
+      const t = (j / 28) * Math.PI * 2;
+      pts.push([cx + w * Math.sin(t) * Math.sin(t / 2), by - (h * (1 + Math.cos(t))) / 2]);
+    }
+    return pts;
+  }
+  function sparkle(cx, cy, r) {
+    const pts = [];
+    for (let k = 0; k <= 8; k++) {
+      const a = (k * Math.PI) / 4 - Math.PI / 2, rr = k % 2 ? r * 0.3 : r;
+      pts.push([cx + rr * Math.cos(a), cy + rr * Math.sin(a)]);
+    }
+    return pts;
+  }
+  function wiggle(x, y0, y1, amp, period) {
+    const pts = [];
+    for (let y = y0; y <= y1; y += 2.5) pts.push([x + amp * Math.sin(((y - y0) / period) * Math.PI * 2), y]);
+    return pts;
+  }
+  const crescent = (cx, cy, r) => ellipseArc(cx, cy, r, r, 60, 300).concat(ellipseArc(cx + 8, cy - 3, r * 0.78, r * 0.78, 300, 60));
+  function artBuilder() {
+    const L = [];
+    let seed = 1;
+    return {
+      L,
+      add(c, pts, w, wobble = 0.6) { L.push({ c, pts: handDrawn(pts, w, (seed++) * 7919, wobble) }); },
+      dot(c, x, y, w) { L.push({ c, pts: [[round1(x), round1(y), round1(w)]] }); },
+    };
+  }
+  function face(a, cx, cy, k) {
+    a.dot('ink', cx - 16 * k, cy, 6 * k);
+    a.dot('ink', cx + 16 * k, cy, 6 * k);
+    a.dot('white', cx - 17.4 * k, cy - 1.6 * k, 2.1 * k);
+    a.dot('white', cx + 14.6 * k, cy - 1.6 * k, 2.1 * k);
+    a.add('ink', ellipseArc(cx, cy + 8 * k, 7 * k, 5 * k, 25, 155), 1.5 * Math.max(0.8, k), 0.1);
+    a.dot('cherry', cx - 27 * k, cy + 7 * k, 6.5 * k);
+    a.dot('cherry', cx + 27 * k, cy + 7 * k, 6.5 * k);
+  }
+  function cakeArt() {
+    const a = artBuilder();
+    const orangeY = (x) => 216 + 7 * Math.sin(((x - 116) / 176) * 1.25 * Math.PI * 2);
+    const redY = (x) => 466 + 8 * Math.sin((((x - 58) / 288) * 1.6 + 0.55) * Math.PI * 2);
+    for (const [x, top] of [[148, 160], [200, 155], [252, 160]]) {
+      a.add('gold', teardrop(x, top - 5, 14, 4.4), 1.3, 0.15);
+      a.add('ink', teardrop(x, top - 3, 22, 7.5), 1.5, 0.25);
+      a.add('ink', [[x, top - 3], [x, top + 1]], 1.4, 0.05);
+    }
+    a.add('white', scallops(124, 290, (x) => orangeY(x) + 5, 5.5), 1.9, 0.25);
+    a.add('white', scallops(84, 328, () => 342, 6.5), 1.9, 0.25);
+    a.add('white', scallops(70, 334, (x) => redY(x) + 3, 7), 2, 0.25);
+    for (let x = 90; x <= 318; x += 14) a.add('ink', [[x, 432], [x + 6.5, 432]], 1.3, 0.1);
+    [[505, 86], [540, 104], [575, 86]].forEach(([y, x0], row) => {
+      for (let x = x0, k = 0; x <= 330; x += 36, k++) a.dot('white', x, y + ((k + row) % 2) * 3, 3.6);
+    });
+    for (const [x, y, r] of [[80, 236, 10], [326, 190, 8], [352, 300, 11], [50, 330, 7], [104, 150, 6]]) a.add('gold', sparkle(x, y, r), 1.9, 0.1);
+    a.add('ink', [[300, 140], [306, 133], [314, 136]], 1.3, 0.2);
+    a.add('ink', [[64, 270], [70, 262]], 1.3, 0.2);
+    a.add('ink', [[340, 252], [346, 258], [352, 254]], 1.3, 0.2);
+    return a.L;
+  }
+  function jellyArt() {
+    const a = artBuilder();
+    a.add('ink', ellipseArc(196, 250, 91, 91, 200, 340), 1.7, 0.5);
+    face(a, 196, 212, 1);
+    for (const [x, y1] of [[164, 392], [186, 410], [208, 396], [230, 404]]) a.add('white', wiggle(x, 258, y1, 4.5, 26), 1.6, 0.2);
+    a.add('ink', ellipseArc(318, 400, 45, 45, 200, 340), 1.4, 0.4);
+    face(a, 318, 384, 0.6);
+    a.add('ink', ellipseArc(84, 372, 41, 41, 200, 340), 1.4, 0.4);
+    face(a, 84, 356, 0.55);
+    for (const [x, y, r] of [[56, 190, 7], [74, 162, 4], [342, 212, 6], [360, 184, 3.5], [300, 300, 5], [40, 290, 4]]) a.add('ink', ellipseArc(x, y, r, r, 0, 360), 1.3, 0.1);
+    for (const [x, y, r] of [[150, 470, 4], [262, 520, 6], [214, 560, 3.5]]) a.add('white', ellipseArc(x, y, r, r, 0, 360), 1.3, 0.1);
+    for (const [x, y, r] of [[128, 150, 7], [272, 138, 6], [360, 340, 7]]) a.add('gold', sparkle(x, y, r), 1.8, 0.1);
+    return a.L;
+  }
+  function fireArt() {
+    const a = artBuilder();
+    for (const [x, y] of [[112, 552], [288, 520], [112, 520], [288, 552]]) {
+      a.add('ink', ellipseArc(x, y, 6.5, 6.5, 0, 360), 1.3, 0.15);
+      a.add('ink', ellipseArc(x + 0.5, y, 2.6, 2.6, 0, 300), 1.1, 0.05);
+    }
+    a.add('ink', [[140, 543], [175, 537]], 1.1, 0.2);
+    a.add('ink', [[226, 531], [262, 525]], 1.1, 0.2);
+    a.add('ink', [[140, 529], [175, 535]], 1.1, 0.2);
+    a.add('ink', [[226, 541], [262, 547]], 1.1, 0.2);
+    for (const x of [70, 104, 150, 250, 296, 332]) a.add('ink', [[x - 4, 566], [x, 573], [x + 1, 563], [x + 4, 572], [x + 8, 565]], 1.2, 0.15);
+    a.add('gold', crescent(322, 168, 20), 1.6, 0.15);
+    for (const [x, y, r] of [[70, 170, 9], [130, 232, 6], [258, 150, 7], [362, 258, 8], [86, 302, 6], [222, 196, 5], [176, 140, 5]]) a.add('gold', sparkle(x, y, r), 1.8, 0.1);
+    a.add('gold', [[200, 474], [194, 446], [204, 418], [198, 392]], 1.6, 0.2);
+    a.add('gold', [[176, 474], [170, 452], [176, 430]], 1.4, 0.2);
+    a.add('gold', [[224, 474], [230, 452], [224, 428]], 1.4, 0.2);
+    return a.L;
+  }
+  TEMPLATES.cake.lines = cakeArt();
+  TEMPLATES.jelly.lines = jellyArt();
+  TEMPLATES.fire.lines = fireArt();
+  TEMPLATES.blank.lines = [];
+
   // ---------------------------------------------------------------------------
   // Animations: "Squeeze it for me" pipes the template, "Scrape it for me" pulls
   // the ruler down (or up) the card.
@@ -1348,10 +1651,11 @@ input[type="text"] {
     const jobs = squeezeJobs(tpl.items);
     if (!jobs.length) return;
     if (!instant) snapshot();
-    recipe = { base: tpl, items: tpl.items.slice(), scrapes: [] };
+    recipe = { base: tpl, items: tpl.items.slice(), scrapes: [], lines: [] };
     if (instant) {
       for (const j of jobs) runJob(j, 1);
       parkRuler();
+      markNextStep(2);
       kick();
       return;
     }
@@ -1386,6 +1690,7 @@ input[type="text"] {
     kick();
   }
   function stepAnim(now) {
+    if (anim.kind === 'draw') { stepDraw(now); return; }
     if (anim.kind === 'squeeze') {
       let t = now - anim.t0;
       while (anim && anim.idx < anim.jobs.length) {
@@ -1400,9 +1705,10 @@ input[type="text"] {
       }
       anim = null;
       parkRuler();
+      markNextStep(2);
       const st = scrapePlan()[0];
       const way = st.a === 0 ? (st.d < 0 ? ' up' : ' down') : '';
-      setHint(`Paint's on. Now <b>pull the ruler${way}</b> through it, or tap <b>Scrape it for me</b>.`);
+      setHint(`Paint's on. Now <b>pull the ruler${way}</b> through it, or tap <b>Scrape</b> under Do it for me.`);
       syncButtons();
     } else {
       if (anim.pause) {
@@ -1434,41 +1740,105 @@ input[type="text"] {
       anim = null;
       ruler.active = true;
       endScrape();
-      setHint(many
-        ? 'Ta-da. The ruler stopped between layers to keep the edges crisp. Your turn: <b>Wipe paint</b> and squeeze your own.'
-        : 'Ta-da. Your turn: <b>Wipe paint</b>, squeeze new blobs, and pull the ruler any way you like.');
+      if (linesOf(currentTemplate()).length) {
+        setHint('Ta-da. Now finish it with line work: tap <b>Draw</b> under Do it for me, or pick up the pen and doodle your own.');
+      } else {
+        setHint(many
+          ? 'Ta-da. The ruler stopped between layers to keep the edges crisp. Your turn: <b>Wipe paint</b> and squeeze your own.'
+          : 'Ta-da. Add some line work with the pen, or <b>Wipe paint</b> and start again.');
+      }
       syncButtons();
     }
+  }
+
+  // "Draw it for me": the card's line work, stroke by stroke.
+  function strokeLen(st) {
+    let L = 0;
+    for (let i = 1; i < st.pts.length; i++) L += Math.hypot(st.pts[i][0] - st.pts[i - 1][0], st.pts[i][1] - st.pts[i - 1][1]);
+    return L;
+  }
+  function autoDraw() {
+    if (busy()) return;
+    const strokes = linesOf(currentTemplate());
+    if (!strokes.length) { toast('This card has no line work yet. Pick up the pen and draw your own.'); return; }
+    setMode('draw');
+    snapshot('lines');
+    anim = { kind: 'draw', strokes, idx: 0, t0: performance.now(), partial: null };
+    setHint('Adding the line work…');
+    syncButtons();
+    kick();
+  }
+  function stepDraw(now) {
+    while (anim.idx < anim.strokes.length) {
+      const st = anim.strokes[anim.idx];
+      const len = strokeLen(st);
+      const dur = st.pts.length === 1 ? 15 : len < 12 ? 20 : 40 + len * 0.6;
+      const f = (now - anim.t0) / dur;
+      if (f < 1) {
+        anim.partial = f > 0 ? { c: st.c, pts: st.pts.slice(0, Math.max(1, Math.ceil(f * st.pts.length))) } : null;
+        return;
+      }
+      state.lines.push(st);
+      recipe.lines.push(st);
+      anim.partial = null;
+      anim.idx++;
+      anim.t0 += dur + 12;
+      redrawLines();
+      if (now < anim.t0) return;
+    }
+    anim = null;
+    markNextStep(0);
+    const canPost = !$('post-gallery').hidden;
+    setHint(`Finished. <b>Save picture</b> to keep it${canPost ? ', or <b>Post to gallery</b> to share it' : ''}.`);
+    syncButtons();
+  }
+  function markNextStep(n) {
+    ['auto-squeeze', 'auto-scrape', 'auto-draw'].forEach((id, i) => $(id).classList.toggle('primary', i + 1 === n));
   }
 
   // ---------------------------------------------------------------------------
   // Undo
   // ---------------------------------------------------------------------------
   const undoStack = [];
-  function snapshot() {
-    const buf = new Float32Array(N * 5);
-    buf.set(V, 0); buf.set(K0, N); buf.set(K1, 2 * N); buf.set(K2, 3 * N); buf.set(S, 4 * N);
-    undoStack.push({ buf, recipe: { base: recipe.base, items: recipe.items.slice(), scrapes: recipe.scrapes.slice() } });
+  // kind 'lines' changes only pen lines, so it skips copying the paint.
+  function snapshot(kind) {
+    let buf = null;
+    if (kind !== 'lines') {
+      buf = new Float32Array(N * 5);
+      buf.set(V, 0); buf.set(K0, N); buf.set(K1, 2 * N); buf.set(K2, 3 * N); buf.set(S, 4 * N);
+    }
+    undoStack.push({
+      buf,
+      lines: state.lines.slice(),
+      recipe: { base: recipe.base, items: recipe.items.slice(), scrapes: recipe.scrapes.slice(), lines: recipe.lines.slice() },
+    });
     if (undoStack.length > 8) undoStack.shift();
     syncButtons();
   }
   function undo() {
-    if (busy() || sq.active || ruler.active) return;
+    if (busy() || sq.active || ruler.active || pen.active) return;
     const snap = undoStack.pop();
     if (!snap) return;
     const b = snap.buf;
-    V.set(b.subarray(0, N)); K0.set(b.subarray(N, 2 * N)); K1.set(b.subarray(2 * N, 3 * N));
-    K2.set(b.subarray(3 * N, 4 * N)); S.set(b.subarray(4 * N));
+    if (b) {
+      V.set(b.subarray(0, N)); K0.set(b.subarray(N, 2 * N)); K1.set(b.subarray(2 * N, 3 * N));
+      K2.set(b.subarray(3 * N, 4 * N)); S.set(b.subarray(4 * N));
+      markAll();
+      parkRuler();
+    }
+    state.lines = snap.lines;
     recipe = snap.recipe;
-    markAll();
-    if (!ruler.active) parkRuler();
+    redrawLines();
     syncButtons();
     kick();
   }
   function wipe(withSnapshot = true) {
     if (withSnapshot) snapshot();
     V.fill(0);
-    recipe = { base: currentTemplate(), items: [], scrapes: [] };
+    state.lines = [];
+    redrawLines();
+    recipe = { base: currentTemplate(), items: [], scrapes: [], lines: [] };
+    markNextStep(currentTemplate().items.length ? 1 : 0);
     markAll();
     parkRuler();
     kick();
@@ -1482,25 +1852,32 @@ input[type="text"] {
     custom: [],     // the viewer's own templates
     picture: null,  // { url, img } traced under the paint
     galleryTpl: null, // a template being played from the shared gallery
+    lines: [],        // pen strokes on top of the paint
+    pen: 'ink', penW: 2.4,
   };
   // What has been done on this card since it was last wiped: the template it
   // started from, every squeeze stroke, and every hand-made pull.
-  let recipe = { base: null, items: [], scrapes: [] };
+  let recipe = { base: null, items: [], scrapes: [], lines: [] };
   const $ = (id) => document.getElementById(id);
   const hintEl = $('hint');
   function setHint(html) { hintEl.innerHTML = html; }
   function defaultHint() {
     if (state.mode === 'squeeze') setHint('<b>Hold</b> to squeeze a dot (it grows the longer you hold). <b>Drag</b> to pipe a line.');
+    else if (state.mode === 'draw') {
+      setHint(linesOf(currentTemplate()).length
+        ? 'Draw on top with a paint pen. The faint dashes show this card\'s line work if you want to trace it.'
+        : 'Draw on top with a paint pen: outlines, faces, sparkles, a border.');
+    }
     else setHint('Press anywhere on the card and <b>drag</b>. The ruler pushes the paint the way you pull it.');
   }
 
   function setMode(m) {
     if (state.mode === m) return;
     state.mode = m;
-    $('mode-squeeze').setAttribute('aria-pressed', String(m === 'squeeze'));
-    $('mode-scrape').setAttribute('aria-pressed', String(m === 'scrape'));
-    $('squeeze-opts').hidden = m !== 'squeeze';
-    $('scrape-opts').hidden = m !== 'scrape';
+    for (const k of ['squeeze', 'scrape', 'draw']) {
+      $(`mode-${k}`).setAttribute('aria-pressed', String(m === k));
+      $(`${k}-opts`).hidden = m !== k;
+    }
     canvas.classList.toggle('grab', m === 'scrape');
     defaultHint();
     kick();
@@ -1571,6 +1948,8 @@ input[type="text"] {
     $('clear').disabled = b;
     $('auto-squeeze').disabled = b || currentTemplate().items.length === 0;
     $('auto-scrape').disabled = b;
+    $('auto-draw').disabled = b || !linesOf(currentTemplate()).length;
+    $('clear-lines').disabled = b;
     $('save').disabled = b;
     for (const id of ['pick-picture', 'pick-template', 'save-template', 'download-template', 'remove-picture']) $(id).disabled = b;
     syncPostButton();
@@ -1618,6 +1997,36 @@ input[type="text"] {
 
   $('mode-squeeze').addEventListener('click', () => setMode('squeeze'));
   $('mode-scrape').addEventListener('click', () => setMode('scrape'));
+  $('mode-draw').addEventListener('click', () => setMode('draw'));
+  function setPen(id) {
+    state.pen = id;
+    for (const b of $('pens').children) b.setAttribute('aria-pressed', String(b.dataset.pen === id));
+  }
+  function setPenW(w) {
+    state.penW = w;
+    for (const b of $('pen-sizes').children) b.setAttribute('aria-pressed', String(Number(b.dataset.w) === w));
+  }
+  for (const [id, look] of Object.entries(PENS)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pen';
+    b.dataset.pen = id;
+    const nib = document.createElement('i');
+    nib.style.background = look.swatch;
+    b.append(nib, document.createTextNode(look.name));
+    b.addEventListener('click', () => { setPen(id); setMode('draw'); });
+    $('pens').appendChild(b);
+  }
+  for (const b of $('pen-sizes').children) b.addEventListener('click', () => setPenW(Number(b.dataset.w)));
+  $('clear-lines').addEventListener('click', () => {
+    if (busy() || !state.lines.length) return;
+    snapshot('lines');
+    state.lines = [];
+    recipe.lines = [];
+    redrawLines();
+    toast('Pen lines cleared');
+  });
+  $('auto-draw').addEventListener('click', autoDraw);
   $('size').addEventListener('input', (e) => setSize(Number(e.target.value)));
   $('angle').addEventListener('input', (e) => setAngle(Number(e.target.value)));
   for (const b of $('angle-chips').children) b.addEventListener('click', () => setAngle(Number(b.dataset.angle)));
@@ -1664,6 +2073,7 @@ input[type="text"] {
     const p = toGrid(e);
     hover = null;
     if (state.mode === 'squeeze') beginSqueeze(p);
+    else if (state.mode === 'draw') beginPen(p);
     else {
       beginScrape(p.x, p.y, grabTest(p.x, p.y));
       canvas.classList.add('grabbing');
@@ -1684,6 +2094,7 @@ input[type="text"] {
     for (const ev of list.length ? list : [e]) {
       const p = toGrid(ev);
       if (state.mode === 'squeeze') moveSqueeze(p);
+      else if (state.mode === 'draw') { if (pen.active) movePen(p); }
       else if (ruler.active) {
         advanceRuler((p.x - lastP.x) * ruler.nx + (p.y - lastP.y) * ruler.ny);
         lastP = p;
@@ -1695,6 +2106,7 @@ input[type="text"] {
     if (e.pointerId !== activePointer) return;
     activePointer = null;
     if (sq.active) endSqueeze();
+    if (pen.active) endPen();
     if (ruler.active) endScrape();
     canvas.classList.remove('grabbing');
     kick();
@@ -1710,6 +2122,7 @@ input[type="text"] {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (k === 's') setMode('squeeze');
     else if (k === 'r') setMode('scrape');
+    else if (k === 'd') setMode('draw');
     else if (k === 'q') setAngle(ruler.angle - 15);
     else if (k === 'e') setAngle(ruler.angle + 15);
     else if (k === '[') setSize(state.size - 1);
@@ -1769,6 +2182,7 @@ input[type="text"] {
     x.imageSmoothingEnabled = true;
     x.imageSmoothingQuality = 'high';
     x.drawImage(paintCanvas, 0, 0, W, H);
+    drawStrokes(x, W / GW, state.lines);
     return new Promise((res) => c.toBlob(res, 'image/png'));
   }
   $('save').addEventListener('click', async () => {
@@ -1779,7 +2193,7 @@ input[type="text"] {
 
   // ---------------------------------------------------------------------------
   // Your own templates. A template file is JSON:
-  //   { kind, version, name, message, items: [dot | line], scrape: [step], picture }
+  //   { kind, version, name, message, items: [dot | line], scrape: [step], lines: [stroke], picture }
   // Files come from anyone, so every field is checked and clamped before use.
   // Saved templates are kept in this browser; download one to share it.
   // ---------------------------------------------------------------------------
@@ -1818,7 +2232,17 @@ input[type="text"] {
       d: num(st.d, -1500, 1500),
     }));
     const picture = typeof o.picture === 'string' && o.picture.length < 4e6 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(o.picture) ? o.picture : null;
-    if (!items.length && !picture) throw badFile('That template has no paint or picture in it.');
+    const lines = [];
+    let penBudget = 20000;
+    for (const st of Array.isArray(o.lines) ? o.lines.slice(0, 600) : []) {
+      if (!st || typeof st !== 'object' || !Object.prototype.hasOwnProperty.call(PENS, st.c) || !Array.isArray(st.pts)) continue;
+      const pts = st.pts.filter(Array.isArray).slice(0, Math.min(2000, penBudget))
+        .map((q) => [num(q[0], -40, GW + 40), num(q[1], -40, GH + 40), num(q[2] === undefined ? 2 : q[2], 0.4, 12)]);
+      penBudget -= pts.length;
+      if (pts.length) lines.push({ c: st.c, pts });
+      if (penBudget <= 0) break;
+    }
+    if (!items.length && !picture && !lines.length) throw badFile('That template has no paint, lines or picture in it.');
     return {
       custom: true,
       name: cleanText(o.name, 24).trim() || 'My card',
@@ -1826,6 +2250,7 @@ input[type="text"] {
       items,
       scrape: scrape.length ? scrape : null,
       picture,
+      lines,
     };
   }
   function templateToJSON(t) {
@@ -1838,6 +2263,7 @@ input[type="text"] {
         ? { t: 'dot', c: it.c, x: round1(it.x), y: round1(it.y), r: round1(it.r) }
         : { t: 'line', c: it.c, pts: it.pts.map((q) => [round1(q[0]), round1(q[1]), round1(q[2])]) })),
       scrape: planOf(t),
+      lines: linesOf(t).map((st) => ({ c: st.c, pts: st.pts.map((q) => [round1(q[0]), round1(q[1]), round1(q[2])]) })),
       picture: t.picture || null,
     };
   }
@@ -1884,6 +2310,7 @@ input[type="text"] {
       msg,
       items: recipe.items.slice(),
       scrape: recipe.scrapes.length ? recipe.scrapes.slice() : planOf(recipe.base),
+      lines: recipe.lines.length ? recipe.lines.slice() : linesOf(recipe.base).slice(),
       picture: state.picture ? state.picture.url : null,
     };
   }
@@ -2226,6 +2653,7 @@ input[type="text"] {
     x.imageSmoothingEnabled = true;
     x.imageSmoothingQuality = 'high';
     x.drawImage(paintCanvas, 0, 0, W, H);
+    drawStrokes(x, W / GW, state.lines);
     return c.toDataURL('image/jpeg', 0.78);
   }
   function galleryWriteFailed(err) {
@@ -2304,6 +2732,8 @@ input[type="text"] {
   // resting above it, ready to pull.
   // ---------------------------------------------------------------------------
   setPaint('red');
+  setPen('ink');
+  setPenW(2.4);
   setSize(10);
   setLen('full');
   setAngle(0);
